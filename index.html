@@ -1409,7 +1409,16 @@
 
   $("share").addEventListener("click", function () {
     var url = tuningLink();
-    function shown(msg) { setResult("idle", msg, "<b>" + url + "</b>"); }
+    // The URL contains location.href, which is attacker-influencable via the
+    // query string. Browsers percent-encode angle brackets so concatenating it
+    // into innerHTML happens not to be exploitable today, but that is the
+    // browser's doing, not ours - so build it as a text node instead.
+    function shown(msg) {
+      setResult("idle", msg, "");
+      var b = document.createElement("b");
+      b.textContent = url;
+      $("rBody").appendChild(b);
+    }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(function () {
         shown("Link copied");

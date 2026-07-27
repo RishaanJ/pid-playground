@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>PID Playground</title>
+
+<style>
+  :root {
+    color-scheme: light;
+
+    --page:    #F6F6F7;
+    --card:    #FFFFFF;
+    --sunken:  #FAFAFA;
+    --hair:    #E8E8EB;
+
+    --ink:     #0A0A0B;
+    --ink-2:   #52525B;
+    --ink-3:   #6B6B73;
+
+    /* monochrome chrome: black is the accent */
+    --accent:  #0A0A0B;
+
+    /* the only colour on the page is the data encoding:
+       slider <-> term bar <-> chart trace */
+    --c-p:     #C2255C;
+    --c-i:     #B45309;
+    --c-d:     #0F766E;
+    --c-g:     #475569;
+    --c-s:     #C2410C;
+
+    --good:    #15803D;
+    --bad:     #B91C1C;
+
+    --ui:   -apple-system, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+    --t-h1: 1.6875rem;
+    --t-h2: 1.0625rem;
+    --t-md: 0.875rem;
+    --t-sm: 0.8125rem;
+    --t-xs: 0.6875rem;
+
+    --r:    12px;
+    --r-sm: 8px;
+
+    /* shadows carry the elevation; no border underneath them */
+    --sh-1: 0 1px 2px rgba(16,24,40,0.05), 0 1px 3px rgba(16,24,40,0.09);
+    --sh-2: 0 1px 3px rgba(16,24,40,0.05), 0 6px 14px rgba(16,24,40,0.07);
+    --sh-3: 0 2px 4px rgba(16,24,40,0.05), 0 10px 22px rgba(16,24,40,0.08);
+
+    --dur: 160ms;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: var(--t-md);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 34px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  h1 {
+    font-size: var(--t-h1);
+    font-weight: 640;
+    letter-spacing: -0.021em;
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--r);
+    box-shadow: var(--sh-2);
+    padding: 18px;
+  }
+
+  /* ---------- level rail ---------- */
+  .rail {
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: var(--card);
+    border-radius: var(--r);
+    box-shadow: var(--sh-1);
+    padding: 5px;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+
+  .chip {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    padding: 8px 11px;
+    cursor: pointer;
+    color: var(--ink-3);
+    font-family: var(--ui);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .chip:hover:not(:disabled):not(.active) { background: var(--page); color: var(--ink-2); }
+  .chip:disabled { opacity: 0.38; cursor: not-allowed; }
+  .chip.active { background: var(--ink); color: #FFFFFF; }
+  .chip.done:not(.active) { color: var(--ink-2); }
+  .chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+  .chip-n {
+    font-family: var(--mono);
+    font-size: var(--t-xs);
+    font-variant-numeric: tabular-nums;
+    opacity: 0.62;
+  }
+  .chip.done:not(.active) .chip-n { color: var(--good); opacity: 1; }
+  .chip-t { font-weight: 500; }
+
+  /* ---------- brief ---------- */
+  .brief { display: flex; flex-direction: column; gap: 5px; }
+  .brief h2 { font-size: var(--t-h2); font-weight: 640; margin: 0; letter-spacing: -0.012em; }
+  .brief p { margin: 0; color: var(--ink-2); max-width: 74ch; }
+  .brief .goal { color: var(--ink); }
+  .brief .goal b { color: var(--c-i); font-weight: 640; }
+
+  .hint {
+    margin-top: 10px;
+    padding: 10px 13px;
+    border-radius: var(--r-sm);
+    background: var(--page);
+    color: var(--ink-2);
+    font-size: var(--t-sm);
+  }
+  .hint b { color: var(--ink); font-weight: 640; }
+
+  /* ---------- layout ---------- */
+  .bench {
+    display: grid;
+    grid-template-columns: minmax(0, 1.32fr) minmax(272px, 0.88fr);
+    gap: 22px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .bench { grid-template-columns: 1fr; } }
+
+  .stage { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .lbl {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: var(--t-xs);
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 9px;
+  }
+
+  #arm, #scope { display: block; width: 100%; border-radius: var(--r-sm); background: var(--sunken); }
+  #arm   { height: 226px; }
+  #scope { height: 174px; }
+
+  .readout {
+    font-family: var(--mono);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* ---------- stats ---------- */
+  .stats { display: flex; flex-wrap: wrap; }
+  .stat { flex: 1 1 0; min-width: 80px; padding-right: 14px; }
+  .stat + .stat { border-left: 1px solid var(--hair); padding-left: 14px; }
+  .stat-k {
+    display: block;
+    font-size: var(--t-xs);
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 2px;
+  }
+  .stat-v { font-family: var(--mono); font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+  /* ---------- console ---------- */
+  .console { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .gains { display: flex; flex-direction: column; gap: 16px; }
+
+  .gain { display: flex; flex-direction: column; gap: 5px; }
+  .gain.hidden { display: none; }
+
+  .gain-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .gain-name { flex: 1; font-size: var(--t-sm); font-weight: 640; letter-spacing: -0.005em; }
+  .gain-name i { font-style: normal; font-weight: 400; color: var(--ink-3); }
+
+  .gain-val {
+    font-family: var(--mono);
+    font-size: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .gain-help { margin: 0; font-size: var(--t-xs); color: var(--ink-3); }
+
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 18px; background: transparent; cursor: pointer; margin: 0;
+  }
+  input[type="range"]::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: var(--hair); }
+  input[type="range"]::-moz-range-track { height: 3px; border-radius: 2px; background: var(--hair); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px; border-radius: 50%; margin-top: -5.5px;
+    background: var(--accent-c, var(--accent));
+    border: 2px solid var(--card);
+    box-shadow: var(--sh-1);
+    transition: transform var(--dur) var(--ease);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent-c, var(--accent));
+    border: 2px solid var(--card);
+    box-shadow: var(--sh-1);
+  }
+  input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.2); }
+  input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.3); }
+  input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(10,10,11,0.22); }
+  input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px rgba(10,10,11,0.22); }
+
+  /* ---------- term bars ---------- */
+  .terms { display: flex; flex-direction: column; gap: 7px; }
+  .term { display: grid; grid-template-columns: 16px 1fr 46px; align-items: center; gap: 10px; }
+  .term.hidden { display: none; }
+  .term-k { font-family: var(--mono); font-size: var(--t-xs); color: var(--ink-3); }
+  .term-track { position: relative; height: 4px; border-radius: 2px; background: var(--hair); }
+  .term-fill { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; background: var(--accent-c); border-radius: 2px; }
+  .term-v { font-family: var(--mono); font-size: var(--t-xs); font-variant-numeric: tabular-nums; color: var(--ink-3); text-align: right; }
+
+  /* ---------- switches ---------- */
+  .switches { display: flex; flex-direction: column; gap: 2px; }
+  .toggle {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0; cursor: pointer; user-select: none;
+    color: var(--ink-2);
+    transition: color var(--dur) var(--ease);
+  }
+  .toggle:hover { color: var(--ink); }
+  .toggle input { accent-color: var(--ink); width: 15px; height: 15px; cursor: pointer; flex: none; }
+  .toggle-t { font-size: var(--t-sm); font-weight: 550; }
+  .toggle-d { display: block; font-size: var(--t-xs); color: var(--ink-3); font-weight: 400; }
+
+  /* ---------- buttons ---------- */
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  button.btn {
+    font-family: var(--ui);
+    font-size: var(--t-sm);
+    font-weight: 570;
+    color: var(--ink);
+    background: var(--card);
+    border: 0;
+    border-radius: var(--r-sm);
+    padding: 9px 15px;
+    cursor: pointer;
+    box-shadow: var(--sh-1);
+    transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+  }
+  button.btn:hover { box-shadow: var(--sh-2); }
+  button.btn:active { transform: translateY(1px); box-shadow: var(--sh-1); }
+  button.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  button.btn.primary { background: var(--ink); color: #FFFFFF; }
+  button.btn.primary:hover { background: #26262B; }
+
+  /* ---------- result ---------- */
+  .result { display: flex; align-items: flex-start; gap: 11px; }
+  .result-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ink-3); flex: none; margin-top: 7px;
+    transition: background var(--dur) var(--ease);
+  }
+  .result h3 { font-size: var(--t-h2); font-weight: 640; margin: 0 0 2px; letter-spacing: -0.012em; }
+  .result p { margin: 0; color: var(--ink-2); max-width: 76ch; }
+  .result b { color: var(--ink); font-weight: 640; }
+  .result.pass h3 { color: var(--good); }
+  .result.fail h3 { color: var(--bad); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <h1>PID Playground</h1>
+
+  <div class="rail" id="rail"></div>
+
+  <section class="card brief">
+    <h2 id="bTitle">Lift the arm</h2>
+    <p id="bWhat"></p>
+    <p class="goal" id="bGoal"></p>
+    <div class="hint" id="bHint"></div>
+  </section>
+
+  <div class="bench">
+    <div class="stage">
+      <div class="card">
+        <div class="lbl">
+          <span id="stageLabel">The arm</span>
+          <span class="readout" id="angleOut">0.0&deg;</span>
+        </div>
+        <canvas id="arm"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="lbl">
+          <span>Response</span>
+          <span class="readout" id="legend"><b style="color:#B45309;font-weight:640">target</b> <b style="color:#C2255C;font-weight:640">arm</b> <b style="color:#0F766E;font-weight:640">motor</b></span>
+        </div>
+        <canvas id="scope"></canvas>
+      </div>
+
+      <div class="card stats">
+        <div class="stat"><span class="stat-k" id="kOver">Overshoot</span><span class="stat-v" id="sOver">&ndash;</span></div>
+        <div class="stat"><span class="stat-k">Settled off</span><span class="stat-v" id="sSettle">&ndash;</span></div>
+        <div class="stat"><span class="stat-k">Motor</span><span class="stat-v" id="sOut">&ndash;</span></div>
+        <div class="stat"><span class="stat-k">Jitter</span><span class="stat-v" id="sCh">&ndash;</span></div>
+      </div>
+    </div>
+
+    <div class="console">
+      <div class="card gains" id="gainsCard">
+        <div class="gain" id="gP" style="--accent-c: var(--c-p);">
+          <div class="gain-top">
+            <span class="gain-name" style="color:var(--c-p)">kP <i>push</i></span>
+            <span class="gain-val" id="vP">0.0</span>
+          </div>
+          <input type="range" id="kP" min="0" max="24" step="0.1" value="0" aria-label="kP proportional gain">
+          <p class="gain-help">Push, proportional to how far off it is.</p>
+        </div>
+
+        <div class="gain" id="gI" style="--accent-c: var(--c-i);">
+          <div class="gain-top">
+            <span class="gain-name" style="color:var(--c-i)">kI <i>patience</i></span>
+            <span class="gain-val" id="vI">0.00</span>
+          </div>
+          <input type="range" id="kI" min="0" max="5" step="0.05" value="0" aria-label="kI integral gain">
+          <p class="gain-help">Grinds out an error that won&rsquo;t budge.</p>
+        </div>
+
+        <div class="gain" id="gD" style="--accent-c: var(--c-d);">
+          <div class="gain-top">
+            <span class="gain-name" style="color:var(--c-d)">kD <i>brakes</i></span>
+            <span class="gain-val" id="vD">0.00</span>
+          </div>
+          <input type="range" id="kD" min="0" max="5" step="0.05" value="0" aria-label="kD derivative gain">
+          <p class="gain-help">Brakes. Amplifies sensor noise.</p>
+        </div>
+
+        <div class="gain" id="gG" style="--accent-c: var(--c-g);">
+          <div class="gain-top">
+            <span class="gain-name" style="color:var(--c-g)">kG <i>gravity assist</i></span>
+            <span class="gain-val" id="vG">0.0</span>
+          </div>
+          <input type="range" id="kG" min="0" max="5" step="0.1" value="0" aria-label="kG gravity feedforward">
+          <p class="gain-help">Holds the arm&rsquo;s weight up front.</p>
+        </div>
+
+        <div class="gain hidden" id="gV" style="--accent-c: var(--c-i);">
+          <div class="gain-top">
+            <span class="gain-name" style="color:var(--c-i)">kV <i>feedforward</i></span>
+            <span class="gain-val" id="vV">0.00</span>
+          </div>
+          <input type="range" id="kV" min="0" max="4" step="0.01" value="0" aria-label="kV velocity feedforward">
+          <p class="gain-help">Volts per 1000 RPM. Predicts the speed.</p>
+        </div>
+
+        <div class="gain hidden" id="gS" style="--accent-c: var(--c-s);">
+          <div class="gain-top">
+            <span class="gain-name" style="color:var(--c-s)">kS <i>unstick</i></span>
+            <span class="gain-val" id="vS">0.0</span>
+          </div>
+          <input type="range" id="kS" min="0" max="3" step="0.05" value="0" aria-label="kS static friction feedforward">
+          <p class="gain-help">A nudge to break friction.</p>
+        </div>
+      </div>
+
+      <div class="card" id="outputCard">
+        <div class="lbl"><span>Output</span></div>
+        <div class="terms">
+          <div class="term" id="termP" style="--accent-c: var(--c-p);">
+            <span class="term-k">P</span>
+            <div class="term-track"><div class="term-fill" id="barP"></div></div>
+            <span class="term-v" id="tP">0.0</span>
+          </div>
+          <div class="term" id="termI" style="--accent-c: var(--c-i);">
+            <span class="term-k">I</span>
+            <div class="term-track"><div class="term-fill" id="barI"></div></div>
+            <span class="term-v" id="tI">0.0</span>
+          </div>
+          <div class="term" id="termD" style="--accent-c: var(--c-d);">
+            <span class="term-k">D</span>
+            <div class="term-track"><div class="term-fill" id="barD"></div></div>
+            <span class="term-v" id="tD">0.0</span>
+          </div>
+          <div class="term" id="termG" style="--accent-c: var(--c-g);">
+            <span class="term-k">G</span>
+            <div class="term-track"><div class="term-fill" id="barG"></div></div>
+            <span class="term-v" id="tG">0.0</span>
+          </div>
+          <div class="term hidden" id="termV" style="--accent-c: var(--c-i);">
+            <span class="term-k">V</span>
+            <div class="term-track"><div class="term-fill" id="barV"></div></div>
+            <span class="term-v" id="tV">0.0</span>
+          </div>
+          <div class="term hidden" id="termS" style="--accent-c: var(--c-s);">
+            <span class="term-k">S</span>
+            <div class="term-track"><div class="term-fill" id="barS"></div></div>
+            <span class="term-v" id="tS">0.0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="switches">
+          <label class="toggle" for="mm">
+            <input type="checkbox" id="mm">
+            <span>
+              <span class="toggle-t">Motion Magic</span>
+              <span class="toggle-d">Ramps the target instead of jumping.</span>
+            </span>
+          </label>
+          <label class="toggle" for="rep">
+            <input type="checkbox" id="rep" checked>
+            <span class="toggle-t">Auto-repeat the test</span>
+          </label>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="run">Run test</button>
+          <button class="btn" id="reset">Reset gains</button>
+          <button class="btn" id="share">Share tuning</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="diagCard" hidden>
+    <div class="lbl"><span>Read the trace</span><span class="readout" id="diagScore">0 / 0</span></div>
+    <p id="diagQ" style="margin:0 0 12px; color:var(--ink-2)">
+      This arm is tuned badly. Look at the response curve above &mdash; what is wrong with it?
+    </p>
+    <div class="row" id="diagOpts"></div>
+    <div id="diagFb" hidden style="margin-top:13px; padding-top:13px; border-top:1px solid var(--hair)">
+      <h3 id="diagFbH" style="font-size:var(--t-h2);font-weight:640;margin:0 0 3px"></h3>
+      <p id="diagFbP" style="margin:0 0 12px;color:var(--ink-2);max-width:76ch"></p>
+      <button class="btn primary" id="diagNext">Next case</button>
+    </div>
+  </div>
+
+  <div class="card result" id="result">
+    <span class="result-dot" id="rDot"></span>
+    <div>
+      <h3 id="rHead">Ready</h3>
+      <p id="rBody">Drag a slider &mdash; the test runs itself.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+(function () {
+  "use strict";
+
+  var DEG = 180 / Math.PI;
+  var SUB = 0.002;         // 2 ms physics step
+  var SAMPLE = 0.02;       // 20 ms scope sample
+  var GRAV = 3.0, DAMP = 2.4, INERTIA = 1.0, VMAX = 12.0;
+  var T0 = Math.PI / 3;    // 60 deg: at 90 deg gravity would vanish at the target
+                           // and the whole steady-state-error lesson with it.
+
+  // ---------------- levels ----------------
+  var LEVELS = [
+    {
+      name: "Lift the arm",
+      what: "Gravity pulls the arm down. Push it up to the gold line.",
+      goal: "Get the arm to the target, within <b>10&deg;</b>.",
+      hint: "Only kP matters. Drag it up until the arm reaches the line.",
+      env: {}, dur: 6, gains: ["P", "I", "D", "G"],
+      pass: function (m) { return m.minErr < 10; },
+      why: "kP alone can reach a target, but watch how it gets there."
+    },
+    {
+      name: "Stop the bounce",
+      what: "Now arrive under control instead of slamming into place.",
+      goal: "Reach the target and overshoot by less than <b>5&deg;</b>.",
+      hint: "Raise kP for speed, then add kD &mdash; the brakes.",
+      env: {}, dur: 6, gains: ["P", "I", "D", "G"],
+      pass: function (m) { return m.minErr < 10 && m.overshoot < 5; },
+      why: "kD damps the approach so a high kP stops being dangerous."
+    },
+    {
+      name: "Kill the sag",
+      what: "It stops just short and stays there &mdash; kP's push shrinks with the gap until gravity balances it.",
+      goal: "Settle within <b>1&deg;</b> of the line.",
+      hint: "That gap is steady-state error. kG holds the weight so kP doesn't have to.",
+      env: {}, dur: 6, gains: ["P", "I", "D", "G"],
+      pass: function (m) { return m.settleErr < 1; },
+      why: "kG cancels a force you can predict instead of reacting to it."
+    },
+    {
+      name: "Smooth operator",
+      what: "A step command slams the motor to full power. Motion Magic ramps the target instead.",
+      goal: "With <b>Motion Magic on</b>, settle within 1&deg; and overshoot under 4&deg;.",
+      hint: "Keep your gains and tick Motion Magic. A dip before the climb is kG's job.",
+      env: {}, dur: 7, gains: ["P", "I", "D", "G"], needMM: true,
+      pass: function (m) { return m.settleErr < 1 && m.overshoot < 4; },
+      why: "The profile plans the trip so PID only ever sees a small error."
+    },
+    {
+      name: "Noisy encoder",
+      what: "The encoder reading jitters, and kD divides by time &mdash; so it multiplies that noise.",
+      goal: "Settle within 2&deg; <b>and</b> keep the motor from buzzing (jitter under 1.0).",
+      hint: "Turn kD down to 0.5 or less. Lean on kG and Motion Magic instead.",
+      env: { noise: { tick: 0.006, sigma: 0.0025 } }, dur: 7, gains: ["P", "I", "D", "G"],
+      pass: function (m) { return m.settleErr < 2 && m.chatter < 1.0; },
+      why: "This is why real robots keep kD small."
+    },
+    {
+      name: "Sticky gearbox",
+      what: "Static friction. Small commands do nothing until you push hard enough to break loose.",
+      goal: "Settle within <b>1.5&deg;</b> despite the stiction.",
+      hint: "kS is now unlocked &mdash; a constant nudge. Around 1.0&ndash;1.5 breaks friction.",
+      env: { stiction: 1.1 }, dur: 7, gains: ["P", "I", "D", "G", "S"],
+      pass: function (m) { return m.settleErr < 1.5; },
+      why: "kS is to friction what kG is to gravity."
+    },
+    {
+      name: "Brownout battery",
+      what: "Push past 8&nbsp;V for long and the battery sags to 7&nbsp;V. On a real robot that costs you the match.",
+      goal: "Settle within 1.5&deg; <b>without ever browning out</b>.",
+      hint: "Stop slamming the motor. Motion Magic plus kG keeps demand low.",
+      env: { brownout: { thresh: 8, sagged: 7 } }, dur: 7, gains: ["P", "I", "D", "G", "S"],
+      pass: function (m) { return m.settleErr < 1.5 && !m.browned; },
+      why: "Less current means the battery survives."
+    },
+    {
+      name: "Game piece",
+      what: "Three seconds in it grabs a game piece and doubles in weight, so your kG is now wrong.",
+      goal: "Recover to within <b>3&deg;</b> and hold it.",
+      hint: "kG can't know about the game piece, but kI can. Try kI around 3&ndash;5.",
+      env: { massAt: { t: 3.0, mul: 2.2 } }, dur: 10, gains: ["P", "I", "D", "G", "S"],
+      pass: function (m) { return m.worstLate < 3; },
+      why: "Feedforward handles what you can predict; integral handles what you can't."
+    },
+    {
+      name: "Playing defense",
+      what: "A defender shoves the arm every 1.5 seconds.",
+      goal: "Never get knocked more than <b>6&deg;</b> off target in the last stretch.",
+      hint: "Stiff and well damped: high kP to snap back, enough kD to stop the ringing.",
+      env: { disturb: { every: 1.5, mag: 7 } }, dur: 8, gains: ["P", "I", "D", "G", "S"],
+      pass: function (m) { return m.worstLate < 6; },
+      why: "Disturbance rejection is why we close the loop at all."
+    },
+    {
+      name: "Match sequence",
+      what: "Stow, score low, score high &mdash; three positions back to back.",
+      goal: "Hit <b>every</b> position within 3&deg; before the next one is called.",
+      hint: "Keep the gains that survived. Motion Magic still arrives on time.",
+      env: { sequence: [{ t: 0, ang: 60 }, { t: 2.5, ang: 12 }, { t: 5, ang: 85 }] },
+      dur: 8, gains: ["P", "I", "D", "G", "S"],
+      pass: function (m) { return m.waypointErr < 3; },
+      why: "Profile + feedforward + PID, doing a real match cycle."
+    },
+    {
+      name: "Spin up",
+      what: "A new mechanism: a shooter flywheel. There is no position here \u2014 you are controlling SPEED, and it has to hold 4000 RPM.",
+      goal: "Hold <b>4000 RPM</b>, settling within 60 RPM.",
+      hint: "Try kP on its own first and watch it stall out. Holding a speed needs constant voltage, and kP's push dies as the error does. kV is the fix \u2014 about 2.4 volts per 1000 RPM.",
+      env: { plant: "flywheel" }, dur: 6, gains: ["P", "I", "D", "V"], range: { P: [0, 8, 0.05], I: [0, 5, 0.05], D: [0, 3, 0.05], V: [0, 4, 0.01] },
+      pass: function (m) { return m.settleErr < 60; },
+      why: "Feedforward does the work, PID only trims. On a flywheel that is not a nicety \u2014 kP alone physically cannot hold speed."
+    },
+    {
+      name: "Rapid fire",
+      what: "Game pieces feed through every 2 seconds and each one steals about 350 RPM. How fast you recover is your cycle time.",
+      goal: "Recover to within 75 RPM in under <b>0.5 s</b> after every shot.",
+      hint: "Keep kV holding the baseline, then add kP so it slams back after each hit. A little kI closes the last gap.",
+      env: { plant: "flywheel", shotEvery: 2.0, shotFirst: 3.0, shotLoss: 350 },
+      dur: 10, gains: ["P", "I", "D", "V"], range: { P: [0, 8, 0.05], I: [0, 5, 0.05], D: [0, 3, 0.05], V: [0, 4, 0.01] },
+      pass: function (m) { return m.worstRecover < 0.5 && m.meanErr < 100; },
+      why: "Feedforward holds the speed; feedback buys back the recovery time. That is the whole shooter in one loop."
+    },
+    {
+      name: "Diagnose",
+      what: "No sliders this time. You are handed a badly tuned arm and you have to name the fault from its response curve alone \u2014 the way you would reading a plot in Phoenix Tuner.",
+      goal: "Identify what is wrong. Five faults, drawn at random.",
+      hint: "Ask three questions in order: does it reach the target at all, does it fly past, and does it sit still once it arrives?",
+      env: { diagnose: true }, dur: 7, gains: [],
+      pass: function () { return false; },
+      why: ""
+    }
+  ];
+
+  // Each case is a real tuning fault, verified to produce a distinct signature.
+  var CASES = [
+    { key: "lowP", g: { P: 4, I: 0, D: 0, G: 0, S: 0 }, env: {},
+      why: "It crawls up and stalls about 40\u00b0 short, with no overshoot at all. The push is proportional to the error and this one is simply too weak to finish the job." },
+    { key: "highP", g: { P: 23, I: 0, D: 0, G: 3, S: 0 }, env: {},
+      why: "It reaches the line fast, sails ~19\u00b0 past, and rings back and forth. Plenty of push, nothing damping the approach." },
+    { key: "noG", g: { P: 14, I: 0, D: 2.5, G: 0, S: 0 }, env: {},
+      why: "A clean approach with no overshoot \u2014 then it parks a few degrees short and stays there forever. As the gap shrinks so does kP's push, until it exactly balances gravity." },
+    { key: "noisyD", g: { P: 12, I: 0, D: 3.5, G: 3, S: 0 }, env: { noise: { tick: 0.006, sigma: 0.0025 } },
+      why: "The position is roughly right, but the trace is fuzzy and the motor output is thrashing. kD divides by time, so it multiplies the encoder's noise." },
+    { key: "windup", g: { P: 6, I: 4.5, D: 0.5, G: 0, S: 0 }, env: {},
+      why: "It sails well past the target and then creeps back down. While the error was large the integral kept piling up, and all of it has to unwind again." }
+  ];
+
+  var ANSWERS = [
+    { key: "lowP",   label: "kP is too low" },
+    { key: "highP",  label: "kP too high, no kD" },
+    { key: "noG",    label: "Steady-state error, no kG" },
+    { key: "noisyD", label: "kD too high on a noisy sensor" },
+    { key: "windup", label: "Integral wind-up" }
+  ];
+
+  var DIAG = LEVELS.length - 1;
+  var diagCase = null, diagRight = 0, diagTotal = 0, diagAnswered = false;
+
+  var STORE = "pidPlayground.progress";
+  function saveProgress() {
+    try {
+      window.localStorage.setItem(STORE, JSON.stringify({ d: done, u: unlockedAll }));
+    } catch (e) { /* private mode or partitioned storage - progress just will not persist */ }
+  }
+  function loadProgress() {
+    try {
+      var raw = window.localStorage.getItem(STORE);
+      if (!raw) return;
+      var o = JSON.parse(raw);
+      if (o && o.d && o.d.length === done.length) done = o.d;
+      if (o && o.u) unlockedAll = true;
+    } catch (e) { /* ignore */ }
+  }
+
+  var DEFAULT_RANGE = { P: [0, 24, 0.1], I: [0, 5, 0.05], D: [0, 5, 0.05], G: [0, 5, 0.1], S: [0, 3, 0.05], V: [0, 4, 0.01] };
+  var done = LEVELS.map(function () { return false; });
+  var level = 0;
+  var unlockedAll = false;
+
+  // A known-good tuning per level, taken from the verification sweep.
+  var SOLUTIONS = [
+    { P: 16, I: 0, D: 2.5, G: 0,   S: 0,   mm: false },
+    { P: 16, I: 0, D: 2.5, G: 0,   S: 0,   mm: false },
+    { P: 16, I: 0, D: 2.5, G: 3,   S: 0,   mm: false },
+    { P: 16, I: 0, D: 2.5, G: 3,   S: 0,   mm: true  },
+    { P: 10, I: 0, D: 0.4, G: 3,   S: 0,   mm: true  },
+    { P: 16, I: 0, D: 2.5, G: 3,   S: 1.2, mm: false },
+    { P: 16, I: 0, D: 2.5, G: 3,   S: 0,   mm: true  },
+    { P: 16, I: 4, D: 2.5, G: 3,   S: 0,   mm: false },
+    { P: 16, I: 0, D: 2.5, G: 3,   S: 0,   mm: false },
+    { P: 16, I: 0, D: 2.5, G: 3,   S: 0,   mm: false },
+    { P: 2,  I: 0, D: 0,   V: 2.41, mm: false },
+    { P: 5,  I: 2, D: 0,   V: 2.41, mm: false }
+  ];
+
+  // ---------------- state ----------------
+  var theta = 0, omega = 0, integral = 0, prevErr = 0, prevOut = 0;
+  var profPos = 0, profVel = 0, profInit = false;
+  var target = T0, gravMul = 1, vmaxNow = VMAX, browned = false;
+  var bumpFlash = 0, hasPiece = false;
+  var terms = { p: 0, i: 0, d: 0, g: 0, s: 0, v: 0, out: 0 };
+  var gains = { P: 0, I: 0, D: 0, G: 0, S: 0, V: 0 };
+
+  // ---- flywheel plant (velocity control) ----
+  // rpm' = (K*V - rpm)/TAU.  K = free speed per volt, TAU = spin-up constant.
+  var FW_K = 415, FW_TAU = 0.35, FW_TARGET = 4000;
+  var rpm = 0, spinAngle = 0, shotFlash = 0, shotCount = 0, lastShotT = -99;
+  var motionMagic = false, autoRep = true;
+
+  var trace = [];
+  var rec = [];
+  var testT = -1, idleT = 0, scored = false;
+  var chSum = 0, chN = 0;
+  var seed = 12345;
+
+  function rnd() {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var KEYS = ["P", "I", "D", "G", "S", "V"];
+  var sliders = {}, vals = {}, gboxes = {};
+  KEYS.forEach(function (k) {
+    sliders[k] = $("k" + k); vals[k] = $("v" + k); gboxes[k] = $("g" + k);
+  });
+  var bars = { p: $("barP"), i: $("barI"), d: $("barD"), g: $("barG"), s: $("barS"), v: $("barV") };
+  var tvals = { p: $("tP"), i: $("tI"), d: $("tD"), g: $("tG"), s: $("tS"), v: $("tV") };
+
+  var armC = $("arm"), scopeC = $("scope");
+  var armX = armC.getContext("2d"), scopeX = scopeC.getContext("2d");
+
+  // ---------------- UI ----------------
+  function renderRail() {
+    var h = "";
+    for (var i = 0; i < LEVELS.length; i++) {
+      var unlocked = unlockedAll || i === 0 || done[i - 1] || done[i];
+      h += '<button class="chip' + (i === level ? " active" : "") + (done[i] ? " done" : "") + '"' +
+           (unlocked ? "" : " disabled") + ' data-i="' + i + '">' +
+           '<span class="chip-n">' + (done[i] ? "&#10003;" : (i < 9 ? "0" : "") + (i + 1)) + "</span>" +
+           '<span class="chip-t">' + LEVELS[i].name + "</span></button>";
+    }
+    $("rail").innerHTML = h;
+    var chips = $("rail").querySelectorAll(".chip");
+    for (var j = 0; j < chips.length; j++) {
+      chips[j].addEventListener("click", function (e) {
+        selectLevel(parseInt(e.currentTarget.getAttribute("data-i"), 10));
+      });
+    }
+  }
+
+  function selectLevel(i) {
+    level = i;
+    var L = LEVELS[i];
+    $("bTitle").textContent = L.name;
+    $("bWhat").textContent = L.what;
+    $("bGoal").innerHTML = "Goal: " + L.goal;
+    $("bHint").innerHTML = "<b>Hint:</b> " + L.hint;
+
+    var isDiag = !!L.env.diagnose;
+    $("diagCard").hidden = !isDiag;
+    $("result").hidden = isDiag;
+    $("gainsCard").style.display = isDiag ? "none" : "";
+    $("outputCard").style.display = isDiag ? "none" : "";
+    if (isDiag) newCase();
+    var isFw = L.env.plant === "flywheel";
+    $("kOver").textContent = isFw ? "Recovery" : "Overshoot";
+    $("stageLabel").textContent = isFw ? "The flywheel" : "The arm";
+    $("legend").innerHTML = isFw
+      ? '<b style="color:#B45309;font-weight:640">target</b> <b style="color:#C2255C;font-weight:640">rpm</b> <b style="color:#0F766E;font-weight:640">motor</b>'
+      : '<b style="color:#B45309;font-weight:640">target</b> <b style="color:#C2255C;font-weight:640">arm</b> <b style="color:#0F766E;font-weight:640">motor</b>';
+
+    KEYS.forEach(function (k) {
+      var on = L.gains.indexOf(k) >= 0;
+      gboxes[k].classList.toggle("hidden", !on);
+      $("term" + k).classList.toggle("hidden", !on);
+      if (on && L.range && L.range[k]) {
+        sliders[k].min = L.range[k][0];
+        sliders[k].max = L.range[k][1];
+        sliders[k].step = L.range[k][2];
+      } else if (on && DEFAULT_RANGE[k]) {
+        sliders[k].min = DEFAULT_RANGE[k][0];
+        sliders[k].max = DEFAULT_RANGE[k][1];
+        sliders[k].step = DEFAULT_RANGE[k][2];
+      }
+      if (!on) { sliders[k].value = 0; }
+    });
+
+    readSliders();
+    renderRail();
+    setResult("idle", "Ready", "Drag a slider &mdash; the test runs itself.");
+    startTest();
+  }
+
+  function renderOptions() {
+    var h = "";
+    for (var i = 0; i < ANSWERS.length; i++) {
+      h += '<button class="btn" data-k="' + ANSWERS[i].key + '">' + ANSWERS[i].label + "</button>";
+    }
+    $("diagOpts").innerHTML = h;
+    var bs = $("diagOpts").querySelectorAll("button");
+    for (var j = 0; j < bs.length; j++) {
+      bs[j].addEventListener("click", function (e) { answerCase(e.currentTarget.getAttribute("data-k")); });
+    }
+  }
+
+  function newCase() {
+    diagCase = CASES[(Math.random() * CASES.length) | 0];
+    diagAnswered = false;
+    LEVELS[DIAG].env = diagCase.env;      // the plant changes with the case
+    LEVELS[DIAG].env.diagnose = true;
+    KEYS.forEach(function (k) { sliders[k].value = diagCase.g[k] === undefined ? 0 : diagCase.g[k]; });
+    $("mm").checked = false; motionMagic = false;
+    readSliders();
+    renderOptions();
+    $("diagFb").hidden = true;
+    $("diagScore").textContent = diagRight + " / " + diagTotal;
+    startTest();
+  }
+
+  function answerCase(key) {
+    if (diagAnswered) return;
+    diagAnswered = true;
+    diagTotal++;
+    var right = key === diagCase.key;
+    if (right) diagRight++;
+    $("diagScore").textContent = diagRight + " / " + diagTotal;
+
+    var bs = $("diagOpts").querySelectorAll("button");
+    for (var i = 0; i < bs.length; i++) {
+      var k = bs[i].getAttribute("data-k");
+      if (k === diagCase.key) { bs[i].style.background = "#15803D"; bs[i].style.color = "#fff"; }
+      else if (k === key) { bs[i].style.background = "#B91C1C"; bs[i].style.color = "#fff"; }
+      bs[i].disabled = true;
+    }
+    var lbl = "";
+    for (var j = 0; j < ANSWERS.length; j++) if (ANSWERS[j].key === diagCase.key) lbl = ANSWERS[j].label;
+    $("diagFbH").textContent = right ? "Correct \u2014 " + lbl : "Not quite. It was: " + lbl;
+    $("diagFbH").style.color = right ? "#15803D" : "#B91C1C";
+    $("diagFbP").innerHTML = diagCase.why;
+    $("diagFb").hidden = false;
+  }
+
+  function readSliders() {
+    KEYS.forEach(function (k) { gains[k] = parseFloat(sliders[k].value); });
+    vals.P.textContent = gains.P.toFixed(1);
+    vals.I.textContent = gains.I.toFixed(2);
+    vals.D.textContent = gains.D.toFixed(2);
+    vals.G.textContent = gains.G.toFixed(1);
+    vals.S.textContent = gains.S.toFixed(1);
+    vals.V.textContent = gains.V.toFixed(2);
+  }
+
+  KEYS.forEach(function (k) {
+    sliders[k].addEventListener("input", function () { readSliders(); startTest(); });
+  });
+
+  $("mm").addEventListener("change", function (e) { motionMagic = e.target.checked; startTest(); });
+  $("rep").addEventListener("change", function (e) { autoRep = e.target.checked; });
+  $("run").addEventListener("click", startTest);
+  $("diagNext").addEventListener("click", newCase);
+  $("reset").addEventListener("click", function () {
+    KEYS.forEach(function (k) { sliders[k].value = 0; });
+    readSliders(); startTest();
+  });
+
+  function setResult(kind, head, body) {
+    var el = $("result");
+    el.classList.remove("pass", "fail");
+    if (kind === "pass") el.classList.add("pass");
+    if (kind === "fail") el.classList.add("fail");
+    $("rDot").style.background =
+      kind === "pass" ? "var(--gold)" : kind === "fail" ? "var(--coral)" : "var(--muted)";
+    $("rHead").textContent = head;
+    $("rBody").innerHTML = body;
+  }
+
+  function startTest() {
+    theta = 0; omega = 0; integral = 0; prevErr = 0; prevOut = 0;
+    profPos = 0; profVel = 0; profInit = false;
+    target = T0; gravMul = 1; vmaxNow = VMAX; browned = false;
+    hasPiece = false; bumpFlash = 0;
+    trace.length = 0; rec.length = 0;
+    chSum = 0; chN = 0;
+    testT = 0; idleT = 0; scored = false;
+    seed = 12345;
+    rpm = 0; spinAngle = 0; shotFlash = 0; shotCount = 0; lastShotT = -99;
+  }
+
+  // ---------------- simulation ----------------
+  function stepFlywheel(dt, t, env) {
+    // a game piece passing through robs energy instantly
+    if (env.shotEvery && t > env.shotFirst) {
+      var k = Math.floor((t - env.shotFirst) / env.shotEvery);
+      var phase = (t - env.shotFirst) - k * env.shotEvery;
+      if (phase < dt && t - lastShotT > env.shotEvery * 0.5) {
+        rpm -= env.shotLoss; if (rpm < 0) rpm = 0;
+        shotFlash = 0.28; shotCount++; lastShotT = t;
+      }
+    }
+
+    var err = FW_TARGET - rpm;
+    if (chN === 0) prevErr = err;
+    integral = Math.max(-40000, Math.min(40000, integral + err * dt));
+    var deriv = (err - prevErr) / dt;
+    prevErr = err;
+
+    terms.p = gains.P * err / 1000;
+    terms.i = gains.I * integral / 1000;
+    terms.d = gains.D * deriv / 100000;
+    terms.v = gains.V * FW_TARGET / 1000;
+    terms.g = 0; terms.s = 0;
+
+    var out = terms.p + terms.i + terms.d + terms.v;
+    out = Math.max(0, Math.min(VMAX, out));   // you never actively brake a flywheel
+    terms.out = out;
+
+    chSum += Math.abs(out - prevOut); chN++;
+    prevOut = out;
+
+    rpm += ((FW_K * out - rpm) / FW_TAU) * dt;
+    if (rpm < 0) rpm = 0;
+    spinAngle += (rpm / 60) * Math.PI * 2 * dt * 0.06;   // slowed for legibility
+    if (shotFlash > 0) shotFlash -= dt;
+    return FW_TARGET;
+  }
+
+  function step(dt, t) {
+    var env = LEVELS[level].env;
+    if (env.plant === "flywheel") return stepFlywheel(dt, t, env);
+
+    target = T0;
+    if (env.sequence) {
+      for (var q = 0; q < env.sequence.length; q++) {
+        if (t >= env.sequence[q].t) target = env.sequence[q].ang / DEG;
+      }
+    }
+
+    gravMul = 1;
+    if (env.massAt && t >= env.massAt.t) { gravMul = env.massAt.mul; hasPiece = true; }
+
+    vmaxNow = VMAX;
+    if (env.brownout && Math.abs(prevOut) > env.brownout.thresh) {
+      vmaxNow = env.brownout.sagged;
+      if (Math.abs(prevOut) > env.brownout.thresh + 1) browned = true;
+    }
+
+    // sensor
+    var meas = theta;
+    if (env.noise) {
+      if (env.noise.tick) meas = Math.round(meas / env.noise.tick) * env.noise.tick;
+      if (env.noise.sigma) meas += (rnd() - 0.5) * 2 * env.noise.sigma;
+    }
+
+    // profile
+    var cmd;
+    if (motionMagic) {
+      if (!profInit) { profPos = theta; profInit = true; }
+      var CRUISE = 1.0, ACCEL = 1.6;
+      var remain = target - profPos;
+      var dir = remain > 0 ? 1 : -1;
+      var vStop = Math.sqrt(Math.max(0, 2 * ACCEL * Math.abs(remain)));
+      var vWant = dir * Math.min(CRUISE, vStop);
+      var maxDv = ACCEL * dt;
+      profVel += Math.max(-maxDv, Math.min(maxDv, vWant - profVel));
+      profPos += profVel * dt;
+      if (Math.abs(target - profPos) < 0.002 && Math.abs(profVel) < 0.02) { profPos = target; profVel = 0; }
+      cmd = profPos;
+    } else cmd = target;
+
+    var err = cmd - meas;
+    if (chN === 0) prevErr = err;
+    integral = Math.max(-8, Math.min(8, integral + err * dt));
+    var deriv = (err - prevErr) / dt;
+    prevErr = err;
+
+    terms.p = gains.P * err;
+    terms.i = gains.I * integral;
+    terms.d = gains.D * deriv;
+    terms.g = gains.G * Math.cos(meas);
+    terms.s = gains.S * (err > 0.004 ? 1 : err < -0.004 ? -1 : 0);
+
+    var out = terms.p + terms.i + terms.d + terms.g + terms.s;
+    out = Math.max(-vmaxNow, Math.min(vmaxNow, out));
+    terms.out = out;
+
+    chSum += Math.abs(out - prevOut); chN++;
+    prevOut = out;
+
+    var torque = out - GRAV * gravMul * Math.cos(theta) - DAMP * omega;
+
+    if (env.disturb && t > 1.0) {
+      var k = Math.floor(t / env.disturb.every);
+      var phase = t - k * env.disturb.every;
+      if (phase < 0.08) { torque += (k % 2 ? -1 : 1) * env.disturb.mag; bumpFlash = 0.25; }
+    }
+
+    var accel = torque / INERTIA;
+
+    if (env.stiction) {
+      var net = out - GRAV * gravMul * Math.cos(theta);
+      if (Math.abs(omega) < 0.02 && Math.abs(net) < env.stiction) { accel = 0; omega = 0; }
+    }
+
+    omega += accel * dt;
+    theta += omega * dt;
+    if (theta < -0.35) { theta = -0.35; if (omega < 0) omega = 0; }
+    if (theta > 2.9) { theta = 2.9; if (omega > 0) omega = 0; }
+
+    if (bumpFlash > 0) bumpFlash -= dt;
+    return cmd;
+  }
+
+  // ---------------- metrics ----------------
+  function metrics() {
+    var m = { overshoot: 0, settleErr: 999, minErr: 999, worstLate: 0, waypointErr: 0,
+              chatter: 0, browned: browned, earlyDip: 0, meanErr: 999, worstRecover: 99 };
+    if (rec.length < 10) return m;
+
+    // Sag at the start of the run. Motion Magic begins the profile at the arm's
+    // current position, so error starts at zero and P/I/D all output nothing --
+    // only kG is holding the weight. No kG, and gravity simply wins.
+    var startA = rec[0].a;
+    for (var e = 0; e < rec.length && rec[e].t < 1.5; e++) {
+      m.earlyDip = Math.min(m.earlyDip, (rec[e].a - startA) * DEG);
+    }
+
+    var env = LEVELS[level].env;
+
+    if (env.plant === "flywheel") {
+      var tl = rec.slice(-40);
+      m.settleErr = tl.reduce(function (a, r) { return a + Math.abs(FW_TARGET - r.a); }, 0) / tl.length;
+      m.minErr = 1e9;
+      for (var q = 0; q < rec.length; q++) m.minErr = Math.min(m.minErr, Math.abs(FW_TARGET - rec[q].a));
+      var lt = rec.filter(function (r) { return r.t > LEVELS[level].dur - 4; });
+      m.meanErr = lt.reduce(function (a, r) { return a + Math.abs(FW_TARGET - r.a); }, 0) / (lt.length || 1);
+      m.worstRecover = 0;
+      if (env.shotEvery) {
+        for (var sh = env.shotFirst; sh < LEVELS[level].dur - 0.5; sh += env.shotEvery) {
+          var back = null;
+          for (var z = 0; z < rec.length; z++) {
+            if (rec[z].t > sh + 0.05 && back === null && Math.abs(FW_TARGET - rec[z].a) < 75) back = rec[z].t - sh;
+          }
+          m.worstRecover = Math.max(m.worstRecover, back === null ? 99 : back);
+        }
+      }
+      m.chatter = chN ? chSum / chN : 0;
+      return m;
+    }
+
+    var endTarget = rec[rec.length - 1].target;
+    var tgtDeg = endTarget * DEG;
+    var peak = -1e9;
+
+    for (var i = 0; i < rec.length; i++) {
+      if (Math.abs(rec[i].target - endTarget) < 0.001) {
+        peak = Math.max(peak, rec[i].a * DEG);
+        m.minErr = Math.min(m.minErr, Math.abs(tgtDeg - rec[i].a * DEG));
+      }
+    }
+    m.overshoot = Math.max(0, peak - tgtDeg);
+
+    var nTail = Math.min(rec.length, 40);
+    var s = 0;
+    for (var j = rec.length - nTail; j < rec.length; j++) {
+      s += Math.abs(rec[j].target * DEG - rec[j].a * DEG);
+    }
+    m.settleErr = s / nTail;
+
+    var tEnd = rec[rec.length - 1].t;
+    for (var w = 0; w < rec.length; w++) {
+      if (rec[w].t > tEnd - 3) {
+        m.worstLate = Math.max(m.worstLate, Math.abs(rec[w].target * DEG - rec[w].a * DEG));
+      }
+    }
+
+    if (env.sequence) {
+      for (var b = 0; b < env.sequence.length; b++) {
+        var at = (b + 1 < env.sequence.length ? env.sequence[b + 1].t : LEVELS[level].dur) - 0.1;
+        var best = null;
+        for (var z = 0; z < rec.length; z++) {
+          if (rec[z].t <= at && (!best || rec[z].t > best.t)) best = rec[z];
+        }
+        if (best) m.waypointErr = Math.max(m.waypointErr, Math.abs(best.target * DEG - best.a * DEG));
+      }
+    }
+
+    m.chatter = chN ? chSum / chN : 0;
+    return m;
+  }
+
+  function judge(m) {
+    var L = LEVELS[level];
+    if (L.env.diagnose) return;
+    if (L.needMM && !motionMagic) {
+      setResult("fail", "Motion Magic is off",
+        "This level is about the profile. Tick <b>Motion Magic mode</b> and run it again.");
+      return;
+    }
+    if (L.pass(m)) {
+      var first = !done[level];
+      done[level] = true;
+      saveProgress();
+      renderRail();
+      var next = level + 1 < LEVELS.length
+        ? " Level " + (level + 2) + " (<b>" + LEVELS[level + 1].name + "</b>) is unlocked."
+        : " That's all ten &mdash; you've tuned through every failure mode a real arm throws at you.";
+      var extra = (motionMagic && m.earlyDip < -1.5)
+        ? " <br><br>One thing worth fixing anyway: " + sagNote(m)
+        : "";
+      setResult("pass", first ? "Level " + (level + 1) + " complete" : "Passed again",
+        L.why + next + extra);
+    } else {
+      setResult("fail", "Not yet", explain(m));
+    }
+  }
+
+  // The arm dipping before it climbs is the classic Motion Magic surprise, so it
+  // gets its own explanation rather than being lumped in with ordinary error.
+  function sagNote(m) {
+    return "It sags " + Math.abs(m.earlyDip).toFixed(1) + "&deg; first because Motion Magic starts the profile " +
+      "<b>where the arm already is</b> &mdash; error begins at zero, so P, I and D all output nothing. " +
+      "Only <b>kG</b> works without error. Raise it to about <b>3.0</b>.";
+  }
+
+  function explain(m) {
+    var L = LEVELS[level];
+    if (gains.P === 0 && gains.I === 0) {
+      return "Nothing is pushing &mdash; kP and kI are both zero, so gravity just wins. Start with <b>kP</b>.";
+    }
+    if (motionMagic && m.earlyDip < -1.5) return sagNote(m);
+    if (m.minErr > 25) return "It never gets near the target. Raise <b>kP</b>, or add <b>kG</b> so it stops fighting its own weight.";
+    if (L.env.noise && m.chatter >= 1.0) return "The motor is buzzing (jitter " + m.chatter.toFixed(2) + "). <b>kD</b> is amplifying the encoder noise &mdash; turn it down.";
+    if (L.env.brownout && m.browned) return "You browned out the battery. Cut the peak demand: lower <b>kP</b>, lean on <b>kG</b>, and try <b>Motion Magic</b>.";
+    if (m.overshoot > 5) return "Overshooting by " + m.overshoot.toFixed(0) + "&deg;. Add <b>kD</b> to brake on the way in.";
+    if (L.env.massAt && m.worstLate > 3) return "The game piece is dragging it down by " + m.worstLate.toFixed(1) + "&deg;. <b>kG</b> can't know about it &mdash; raise <b>kI</b> so the error gets absorbed.";
+    if (L.env.disturb && m.worstLate > 6) return "The hits are knocking you " + m.worstLate.toFixed(1) + "&deg; off. Stiffen up: more <b>kP</b>, with enough <b>kD</b> to stop the ringing.";
+    if (L.env.sequence && m.waypointErr > 3) return "Missing a waypoint by " + m.waypointErr.toFixed(1) + "&deg;. It needs to arrive before the next position is called.";
+    if (L.env.stiction && m.settleErr > 1.5) return "Friction has it stuck " + m.settleErr.toFixed(1) + "&deg; out. Add <b>kS</b> to break it loose, or <b>kI</b> to grind through.";
+    if (m.settleErr > 1) return "Settling " + m.settleErr.toFixed(1) + "&deg; short &mdash; that's steady-state error. Add <b>kG</b>, or a little <b>kI</b>.";
+    return "So close. Nudge the gain the hint mentions and run it once more.";
+  }
+
+  // ---------------- drawing ----------------
+  function fit(cv) {
+    var r = Math.min(window.devicePixelRatio || 1, 2);
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * r) || cv.height !== Math.round(h * r)) {
+      cv.width = Math.round(w * r); cv.height = Math.round(h * r);
+    }
+    return { w: w, h: h, r: r };
+  }
+
+  function drawArm(cmd) {
+    var d = fit(armC), x = armX;
+    x.setTransform(d.r, 0, 0, d.r, 0, 0);
+    x.clearRect(0, 0, d.w, d.h);
+
+    if (LEVELS[level].env.plant === "flywheel") { drawFlywheel(d, x); return; }
+
+    if (browned) { x.fillStyle = "#B91C1C12"; x.fillRect(0, 0, d.w, d.h); }
+    if (bumpFlash > 0) { x.fillStyle = "#B91C1C1E"; x.fillRect(0, 0, d.w, d.h); }
+
+    var px = d.w * 0.27, py = d.h * 0.76;
+    var len = Math.min(d.w * 0.42, d.h * 0.60);
+
+    x.strokeStyle = "#E4E4E7"; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(d.w * 0.06, py + 0.5); x.lineTo(d.w * 0.94, py + 0.5); x.stroke();
+
+    // target ghost
+    x.strokeStyle = "#B45309"; x.lineWidth = 3; x.globalAlpha = 0.42;
+    x.setLineDash([5, 5]);
+    x.beginPath(); x.moveTo(px, py);
+    x.lineTo(px + Math.cos(target) * len, py - Math.sin(target) * len);
+    x.stroke(); x.setLineDash([]); x.globalAlpha = 1;
+
+    // profile ghost
+    if (motionMagic && Math.abs(cmd - target) > 0.01) {
+      x.strokeStyle = "#E05C87"; x.globalAlpha = 0.45; x.lineWidth = 3;
+      x.beginPath(); x.moveTo(px, py);
+      x.lineTo(px + Math.cos(cmd) * len, py - Math.sin(cmd) * len);
+      x.stroke(); x.globalAlpha = 1;
+    }
+
+    var ax = px + Math.cos(theta) * len, ay = py - Math.sin(theta) * len;
+    x.strokeStyle = "#C2255C"; x.lineWidth = 7; x.lineCap = "round";
+    x.beginPath(); x.moveTo(px, py); x.lineTo(ax, ay); x.stroke();
+    x.lineCap = "butt";
+
+    x.fillStyle = hasPiece ? "#B45309" : "#E05C87";
+    x.beginPath(); x.arc(ax, ay, hasPiece ? 14 : 9, 0, Math.PI * 2); x.fill();
+
+    x.fillStyle = "#0A0A0B";
+    x.beginPath(); x.arc(px, py, 5.5, 0, Math.PI * 2); x.fill();
+
+    x.font = "11px 'SF Mono', ui-monospace, Menlo, monospace";
+    if (hasPiece) { x.fillStyle = "#B45309"; x.fillText("game piece loaded", d.w - 128, 18); }
+    if (browned) { x.fillStyle = "#B91C1C"; x.fillText("BROWNOUT", d.w - 128, 34); }
+    if (bumpFlash > 0) { x.fillStyle = "#B91C1C"; x.fillText("HIT!", px - 8, py - len - 14); }
+
+    $("angleOut").textContent = (theta * DEG).toFixed(1) + "\u00b0";
+  }
+
+  function drawFlywheel(d, x) {
+    var cx = d.w * 0.34, cy = d.h * 0.52;
+    var R = Math.min(d.w * 0.20, d.h * 0.36);
+
+    if (shotFlash > 0) { x.fillStyle = "#B4530918"; x.fillRect(0, 0, d.w, d.h); }
+
+    // speed ring: full sweep = target
+    x.strokeStyle = "#E4E4E7"; x.lineWidth = 7;
+    x.beginPath(); x.arc(cx, cy, R * 1.34, -Math.PI * 0.75, Math.PI * 0.75); x.stroke();
+    var frac = Math.max(0, Math.min(1.15, rpm / FW_TARGET));
+    x.strokeStyle = frac > 0.97 && frac < 1.03 ? "#15803D" : "#C2255C";
+    x.lineWidth = 7; x.lineCap = "round";
+    x.beginPath();
+    x.arc(cx, cy, R * 1.34, -Math.PI * 0.75, -Math.PI * 0.75 + Math.PI * 1.5 * Math.min(frac, 1.15));
+    x.stroke(); x.lineCap = "butt";
+
+    // target tick
+    x.strokeStyle = "#B45309"; x.lineWidth = 2;
+    x.beginPath();
+    x.moveTo(cx + Math.cos(Math.PI * 0.75) * R * 1.18, cy + Math.sin(Math.PI * 0.75) * R * 1.18);
+    x.lineTo(cx + Math.cos(Math.PI * 0.75) * R * 1.5, cy + Math.sin(Math.PI * 0.75) * R * 1.5);
+    x.stroke();
+
+    // wheel
+    x.fillStyle = "#CBD5E1"; x.strokeStyle = "#64748B"; x.lineWidth = 2;
+    x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2); x.fill(); x.stroke();
+    x.save();
+    x.translate(cx, cy); x.rotate(spinAngle);
+    x.strokeStyle = "#94A3B8"; x.lineWidth = Math.max(3, R * 0.13); x.lineCap = "round";
+    for (var i = 0; i < 5; i++) {
+      var a = i * Math.PI * 2 / 5;
+      x.beginPath();
+      x.moveTo(Math.cos(a) * R * 0.22, Math.sin(a) * R * 0.22);
+      x.lineTo(Math.cos(a) * R * 0.82, Math.sin(a) * R * 0.82);
+      x.stroke();
+    }
+    x.lineCap = "butt";
+    x.fillStyle = "#FAFAFA"; x.strokeStyle = "#64748B"; x.lineWidth = 1.5;
+    x.beginPath(); x.arc(0, 0, R * 0.2, 0, Math.PI * 2); x.fill(); x.stroke();
+    x.fillStyle = "#0A0A0B";
+    x.beginPath(); x.arc(0, 0, R * 0.07, 0, Math.PI * 2); x.fill();
+    x.restore();
+
+    // hood + a ball on its way out
+    x.strokeStyle = "#94A3B8"; x.lineWidth = 3;
+    x.beginPath(); x.arc(cx, cy, R * 1.62, -Math.PI * 0.46, -Math.PI * 0.04); x.stroke();
+    if (shotFlash > 0) {
+      var pgs = 1 - (shotFlash / 0.28);
+      var bx = cx + R * 1.7 + pgs * d.w * 0.30, by = cy - R * 1.15 - pgs * R * 0.5;
+      x.fillStyle = "#B45309";
+      x.beginPath(); x.arc(bx, by, Math.max(4, R * 0.17), 0, Math.PI * 2); x.fill();
+    }
+
+    // readout
+    x.fillStyle = "#0A0A0B";
+    x.font = "600 26px -apple-system, system-ui, sans-serif";
+    x.fillText(Math.round(rpm) + "", cx + R * 1.95, cy - 2);
+    x.fillStyle = "#6B6B73";
+    x.font = "11px 'SF Mono', ui-monospace, Menlo, monospace";
+    x.fillText("RPM  /  target " + FW_TARGET, cx + R * 1.95, cy + 16);
+    if (shotCount) x.fillText("shots fired: " + shotCount, cx + R * 1.95, cy + 34);
+
+    $("angleOut").textContent = Math.round(rpm) + " rpm";
+  }
+
+  function drawScope() {
+    var d = fit(scopeC), x = scopeX;
+    x.setTransform(d.r, 0, 0, d.r, 0, 0);
+    x.clearRect(0, 0, d.w, d.h);
+
+    var padL = 30, padR = 8, padT = 8, padB = 14;
+    var pw = d.w - padL - padR, ph = d.h - padT - padB;
+    var fw = LEVELS[level].env.plant === "flywheel";
+    var lo = fw ? 0 : -25, hi = fw ? 5200 : 105;
+    var dur = LEVELS[level].dur;
+
+    function yOf(v) { return padT + ph * (1 - (v - lo) / (hi - lo)); }
+    function xOf(t) { return padL + pw * Math.min(1, t / dur); }
+
+    x.strokeStyle = "#E4E4E7"; x.lineWidth = 1;
+    x.font = "10px 'SF Mono', ui-monospace, Menlo, monospace";
+    x.fillStyle = "#6B6B73";
+    (fw ? [0, 2000, 4000] : [0, 30, 60, 90]).forEach(function (g) {
+      var yy = Math.round(yOf(g)) + 0.5;
+      x.beginPath(); x.moveTo(padL, yy); x.lineTo(d.w - padR, yy); x.stroke();
+      x.fillText(fw ? (g / 1000) + "k" : g + "\u00b0", 2, yy + 3);
+    });
+
+    if (trace.length < 2) return;
+
+    // motor output, scaled into the background
+    x.strokeStyle = "#0F766E"; x.globalAlpha = 0.5; x.lineWidth = 1.2;
+    x.beginPath();
+    for (var k = 0; k < trace.length; k++) {
+      var yv = yOf(lo + (trace[k].o / VMAX + 1) / 2 * (fw ? 900 : 22));
+      if (k === 0) x.moveTo(xOf(trace[k].t), yv); else x.lineTo(xOf(trace[k].t), yv);
+    }
+    x.stroke(); x.globalAlpha = 1;
+
+    x.strokeStyle = "#B45309"; x.lineWidth = 2;
+    x.beginPath();
+    for (var i = 0; i < trace.length; i++) {
+      var y1 = yOf(fw ? trace[i].c : trace[i].c * DEG);
+      if (i === 0) x.moveTo(xOf(trace[i].t), y1); else x.lineTo(xOf(trace[i].t), y1);
+    }
+    x.stroke();
+
+    x.strokeStyle = "#C2255C"; x.lineWidth = 2.5;
+    x.beginPath();
+    for (var j = 0; j < trace.length; j++) {
+      var y2 = yOf(fw ? trace[j].a : trace[j].a * DEG);
+      if (j === 0) x.moveTo(xOf(trace[j].t), y2); else x.lineTo(xOf(trace[j].t), y2);
+    }
+    x.stroke();
+
+    var L = trace[trace.length - 1];
+    x.fillStyle = "#E05C87";
+    x.beginPath(); x.arc(xOf(L.t), yOf(fw ? L.a : L.a * DEG), 3.5, 0, Math.PI * 2); x.fill();
+  }
+
+  function drawTerms() {
+    ["p", "i", "d", "g", "s", "v"].forEach(function (k) {
+      var v = Math.max(-VMAX, Math.min(VMAX, terms[k]));
+      var pct = Math.abs(v) / VMAX * 50;
+      var el = bars[k];
+      el.style.left = (v >= 0 ? 50 : 50 - pct) + "%";
+      el.style.width = pct + "%";
+      tvals[k].textContent = terms[k].toFixed(1);
+    });
+  }
+
+  // ---------------- loop ----------------
+  var acc = 0, sAcc = 0, lastNow = performance.now();
+
+  function frame(now) {
+    var dt = Math.min((now - lastNow) / 1000, 0.05);
+    lastNow = now;
+    acc += dt;
+
+    var L = LEVELS[level];
+    var cmd = motionMagic ? profPos : target;
+
+    while (acc >= SUB) {
+      acc -= SUB;
+      if (testT >= 0 && testT < L.dur) {
+        cmd = step(SUB, testT);
+        testT += SUB;
+        sAcc += SUB;
+        if (sAcc >= SAMPLE) {
+          sAcc -= SAMPLE;
+          var isFw = L.env.plant === "flywheel";
+          trace.push({ t: testT, a: isFw ? rpm : theta, c: isFw ? FW_TARGET : cmd, o: terms.out });
+          rec.push({ t: testT, a: isFw ? rpm : theta, target: isFw ? FW_TARGET : target });
+        }
+      } else if (testT >= L.dur) {
+        if (!scored) { scored = true; judge(metrics()); }
+        idleT += SUB;
+        if (autoRep && idleT > 1.2) startTest();
+      }
+    }
+
+    drawArm(cmd);
+    drawScope();
+    drawTerms();
+
+    var m = metrics();
+    var fwL = L.env.plant === "flywheel";
+    $("sOver").textContent = fwL
+      ? (m.worstRecover > 90 ? "\u2013" : m.worstRecover.toFixed(2) + "s")
+      : (m.overshoot > 0.4 ? m.overshoot.toFixed(1) + "\u00b0" : "0\u00b0");
+    $("sSettle").textContent = m.settleErr < 900
+      ? (fwL ? Math.round(m.settleErr) + " rpm" : m.settleErr.toFixed(1) + "\u00b0")
+      : "\u2014";
+    $("sOut").textContent = terms.out.toFixed(1) + "V";
+    $("sCh").textContent = m.chatter.toFixed(2);
+    $("sCh").style.color = m.chatter > 1.0 ? "var(--coral)" : "var(--cream)";
+    $("sOut").style.color = browned ? "var(--coral)" : "var(--cream)";
+
+    requestAnimationFrame(frame);
+  }
+
+  function applyGains(g) {
+    KEYS.forEach(function (k) { sliders[k].value = (g[k] === undefined ? 0 : g[k]); });
+    if (g.mm !== undefined) { $("mm").checked = g.mm; motionMagic = g.mm; }
+    readSliders();
+    startTest();
+  }
+
+  function tuningLink() {
+    var p = ["L=" + (level + 1)];
+    KEYS.forEach(function (k) {
+      if (parseFloat(sliders[k].value) > 0) p.push(k + "=" + sliders[k].value);
+    });
+    if (motionMagic) p.push("mm=1");
+    return location.href.split("#")[0] + "#" + p.join("&");
+  }
+
+  function applyHash() {
+    var h = (location.hash || "").replace(/^#/, "");
+    if (!h) return;
+    var g = {}, lv = null;
+    h.split("&").forEach(function (kv) {
+      var a = kv.split("=");
+      if (a.length !== 2) return;
+      if (a[0] === "L") lv = parseInt(a[1], 10);
+      else if (a[0] === "mm") g.mm = a[1] === "1";
+      else if (KEYS.indexOf(a[0]) >= 0) g[a[0]] = parseFloat(a[1]);
+    });
+    if (lv >= 1 && lv <= LEVELS.length) { unlockedAll = true; selectLevel(lv - 1); }
+    applyGains(g);
+  }
+
+  $("share").addEventListener("click", function () {
+    var url = tuningLink();
+    function shown(msg) { setResult("idle", msg, "<b>" + url + "</b>"); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        shown("Link copied");
+      })["catch"](function () { shown("Copy this link"); });
+    } else shown("Copy this link");
+  });
+
+  window.pid = {
+    unlockAll: function () {
+      unlockedAll = true; saveProgress(); renderRail();
+      return "All 10 levels unlocked \u2014 click any of them.";
+    },
+    level: function (n) {
+      if (!(n >= 1 && n <= LEVELS.length)) return "Pick 1\u2013" + LEVELS.length + ".";
+      unlockedAll = true; selectLevel(n - 1);
+      return "Level " + n + ": " + LEVELS[n - 1].name;
+    },
+    solve: function () {
+      applyGains(SOLUTIONS[level]);
+      return "Applied a known-good tuning for level " + (level + 1) + ". Give it a few seconds.";
+    },
+    tour: function (ms) {
+      unlockedAll = true; renderRail();
+      var i = 0, gap = ms || 9000;
+      (function next() {
+        if (i >= LEVELS.length) return;
+        selectLevel(i); applyGains(SOLUTIONS[i]); i++;
+        setTimeout(next, gap);
+      })();
+      return "Touring all " + LEVELS.length + " levels, solved, ~" + (gap / 1000) + "s each.";
+    },
+    set: applyGains,
+    link: tuningLink,
+    resetProgress: function () {
+      for (var i = 0; i < done.length; i++) done[i] = false;
+      unlockedAll = false; saveProgress(); renderRail(); selectLevel(0);
+      return "Progress cleared.";
+    },
+    help: function () {
+      return [
+        "pid.unlockAll()  unlock every level",
+        "pid.level(7)     jump to a level",
+        "pid.solve()      auto-tune the current level",
+        "pid.tour()       play all 10, solved (pid.tour(5000) to speed up)",
+        "pid.set({P:16,D:2.5,G:3,mm:true})",
+        "pid.link()      shareable URL for the current tuning",
+        "pid.resetProgress()"
+      ].join("\n");
+    }
+  };
+
+  // a share link pasted into an already-open tab only changes the hash,
+  // which does not reload the page - so re-apply it on hashchange too
+  window.addEventListener("hashchange", applyHash);
+
+  loadProgress();
+  readSliders();
+  selectLevel(0);
+  applyHash();
+  requestAnimationFrame(frame);
+  console.info("PID Playground \u2014 type pid.help() for level-skip commands.");
+})();
+</script>
+
+</body>
+</html>

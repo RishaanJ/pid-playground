@@ -1474,5 +1474,22 @@
 })();
 </script>
 
+<!-- Vercel Web Analytics.
+     The endpoint is served by Vercel itself, so it only exists on a Vercel
+     deployment. Guarded to http/https so opening this file directly from disk
+     (which is how students use it) does not throw a 404 in the console. -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script>
+  (function () {
+    if (location.protocol !== "http:" && location.protocol !== "https:") return;
+    var s = document.createElement("script");
+    s.defer = true;
+    s.src = "/_vercel/insights/script.js";
+    document.head.appendChild(s);
+  })();
+</script>
+
 </body>
 </html>

@@ -92,17 +92,50 @@
   }
 
   /* ---------- level rail ---------- */
-  .rail {
+  /* the rail scrolls horizontally, which is invisible on a lot of setups -
+     so it is flanked by real arrow buttons rather than relying on the gesture */
+  .rail-wrap {
     display: flex;
-    gap: 2px;
-    overflow-x: auto;
-    scrollbar-width: none;
+    align-items: stretch;
+    gap: 4px;
     background: var(--card);
     border-radius: var(--r);
     box-shadow: var(--sh-1);
     padding: 5px;
   }
+
+  .rail {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
   .rail::-webkit-scrollbar { display: none; }
+
+  .rail-btn {
+    flex: none;
+    width: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: var(--page);
+    color: var(--ink-2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease),
+                opacity var(--dur) var(--ease);
+  }
+  .rail-btn:hover:not(:disabled) { background: var(--ink); color: #FFFFFF; }
+  .rail-btn:disabled { opacity: 0.22; cursor: default; }
+  .rail-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .rail-btn svg { width: 15px; height: 15px; display: block; }
+
+  /* everything fits - the arrows would just be noise */
+  .rail-wrap.no-overflow .rail-btn { display: none; }
 
   .chip {
     flex: none;
@@ -314,7 +347,21 @@
 
   <h1>PID Playground</h1>
 
-  <div class="rail" id="rail"></div>
+  <div class="rail-wrap" id="railWrap">
+    <button class="rail-btn" id="railPrev" type="button" aria-label="Scroll to earlier levels" aria-controls="rail">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <div class="rail" id="rail"></div>
+    <button class="rail-btn" id="railNext" type="button" aria-label="Scroll to later levels" aria-controls="rail">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
+  </div>
 
   <section class="card brief">
     <h2 id="bTitle">Lift the arm</h2>
@@ -741,7 +788,66 @@
         selectLevel(parseInt(e.currentTarget.getAttribute("data-i"), 10));
       });
     }
+    updateRailArrows();
   }
+
+  // ---- level rail: arrow navigation ----------------------------------------
+  // Horizontal scrolling is undiscoverable without a trackpad, so the arrows
+  // are the primary way to move through the levels, not a nicety.
+
+  function updateRailArrows() {
+    var r = $("rail");
+    var max = r.scrollWidth - r.clientWidth;
+    $("railWrap").classList.toggle("no-overflow", max <= 4);
+    $("railPrev").disabled = r.scrollLeft <= 2;
+    $("railNext").disabled = r.scrollLeft >= max - 2;
+  }
+
+  // Smoothness is requested per-call rather than via CSS scroll-behavior, so
+  // that plain scrollLeft assignments elsewhere stay instant and predictable.
+  function railBehavior() {
+    return (window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches) ? "auto" : "smooth";
+  }
+
+  // Smooth scrolling silently does nothing in some browsers and embedded
+  // webviews. These arrows exist precisely for people whose scrolling is
+  // already broken, so arrival is guaranteed by assignment; the animation is
+  // only ever an enhancement on top.
+  function railScrollTo(target) {
+    var r = $("rail");
+    target = Math.max(0, Math.min(target, r.scrollWidth - r.clientWidth));
+
+    if (railBehavior() === "smooth" && typeof r.scrollTo === "function") {
+      try { r.scrollTo({ left: target, behavior: "smooth" }); }
+      catch (e) { r.scrollLeft = target; }
+      window.setTimeout(function () {
+        if (Math.abs(r.scrollLeft - target) > 2) r.scrollLeft = target;
+        updateRailArrows();
+      }, 400);
+    } else {
+      r.scrollLeft = target;
+    }
+    updateRailArrows();
+  }
+
+  function railScroll(dir) {
+    var r = $("rail");
+    // move by most of a screenful, keeping a chip of overlap for context
+    railScrollTo(r.scrollLeft + dir * Math.max(140, r.clientWidth * 0.8));
+  }
+
+  function scrollActiveIntoView() {
+    var a = $("rail").querySelector(".chip.active");
+    if (!a) return;
+    var r = $("rail");
+    railScrollTo(a.offsetLeft - (r.clientWidth - a.offsetWidth) / 2);
+  }
+
+  $("railPrev").addEventListener("click", function () { railScroll(-1); });
+  $("railNext").addEventListener("click", function () { railScroll(1); });
+  $("rail").addEventListener("scroll", updateRailArrows, { passive: true });
+  window.addEventListener("resize", updateRailArrows);
 
   function selectLevel(i) {
     level = i;
@@ -782,6 +888,7 @@
 
     readSliders();
     renderRail();
+    scrollActiveIntoView();
     setResult("idle", "Ready", "Drag a slider &mdash; the test runs itself.");
     startTest();
   }

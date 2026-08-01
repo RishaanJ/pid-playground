@@ -230,5 +230,120 @@ for (var s5 = 1; s5 <= 200; s5++) {
 }
 check("200 mechanisms stay finite under aggressive gains", bad === 0);
 
+
+// ============================================================
+// 7. the advanced/realism layer must genuinely change the difficulty
+// ============================================================
+// Mirrors the in-page sbStep, including control-loop rate, sensor delay,
+// noise, gearbox backlash and stiction.
+function simulateReal(cfg, gains, o) {
+  o = o || {};
+  var loopHz = o.loopHz || 500, delay = o.delay || 0, noise = o.noise || 0,
+      backlash = o.backlash || 0, stiction = o.stiction || 0;
+  var target = o.target !== undefined ? o.target : (cfg.kind === "arm" ? Math.PI / 3 : 0.5);
+  var seconds = o.seconds || 8;
+
+  var pos = cfg.kind === "arm" ? -Math.PI / 2 : 0, load = pos, vel = 0;
+  var integral = 0, prevErr = target - pos, volts = 0, ctrlAcc = 1e9;
+  var hist = [], sd = 1;
+  function rnd() { sd = (sd * 1103515245 + 12345) & 0x7fffffff; return sd / 0x7fffffff * 2 - 1; }
+
+  var peak = -Infinity, flips = 0, lastSign = 0, sum = 0, cnt = 0;
+  var steps = Math.round(seconds / SUB);
+
+  for (var n = 0; n < steps; n++) {
+    var t = n * SUB;
+    var meas = load + (noise ? rnd() * noise : 0);
+    hist.push(meas);
+    var sensed = hist[Math.max(0, hist.length - 1 - Math.round(delay / SUB))];
+
+    var period = 1 / loopHz;
+    ctrlAcc += SUB;
+    if (ctrlAcc >= period - 1e-9) {
+      ctrlAcc = 0;
+      var err = target - sensed;
+      integral = Math.max(-50, Math.min(50, integral + err * period));
+      var der = (err - prevErr) / period;
+      prevErr = err;
+      var grav = cfg.kind === "arm" ? Math.cos(sensed) : 1;
+      volts = gains.P * err + gains.I * integral + gains.D * der + gains.G * grav;
+      volts = Math.max(-VBUS_, Math.min(VBUS_, volts));
+    }
+
+    var tau = mechTorque(cfg, volts, vel), net, inertia;
+    if (cfg.kind === "arm") {
+      inertia = cfg.mass * cfg.len * cfg.len;
+      net = tau - cfg.mass * G_ACC * cfg.len * Math.cos(load) - cfg.damp * vel;
+    } else {
+      inertia = cfg.mass;
+      net = tau / cfg.drum - cfg.mass * G_ACC - cfg.damp * vel;
+    }
+    if (stiction) {
+      if (Math.abs(vel) < 1e-3 && Math.abs(net) < stiction) net = 0;
+      else if (Math.abs(vel) >= 1e-3) net -= stiction * (vel > 0 ? 1 : -1);
+    }
+    vel += (net / inertia) * SUB;
+    pos += vel * SUB;
+
+    if (backlash) {
+      var half = backlash / 2;
+      if (pos - load > half) load = pos - half;
+      else if (load - pos > half) load = pos + half;
+    } else load = pos;
+
+    if (cfg.kind === "arm") {
+      if (load < -Math.PI / 2) { load = pos = -Math.PI / 2; if (vel < 0) vel = 0; }
+      if (load > Math.PI / 2) { load = pos = Math.PI / 2; if (vel > 0) vel = 0; }
+    } else {
+      if (load < 0) { load = pos = 0; if (vel < 0) vel = 0; }
+      if (load > cfg.travel) { load = pos = cfg.travel; if (vel > 0) vel = 0; }
+    }
+
+    if (t > 0.3) {
+      if (load > peak) peak = load;
+      var sg = (target - load) > 0 ? 1 : -1;
+      if (lastSign && sg !== lastSign) flips++;
+      lastSign = sg;
+    }
+    if (t > seconds - 2) { sum += Math.abs(target - load); cnt++; }
+  }
+  var settle = cnt ? sum / cnt : 99;
+  var toDeg = cfg.kind === "arm" ? 180 / Math.PI : 100;
+  return {
+    settle: settle * toDeg, overshoot: (peak - target) * toDeg, flips: flips,
+    ok: isFinite(settle) && settle * toDeg < 2.5 && (peak - target) * toDeg < 6 && flips < 8
+  };
+}
+var VBUS_ = 12;
+
+console.log("\n=== 7. the realism layer actually bites ===");
+var rc = { kind: "arm", motor: "NEO", motors: 2, ratio: 60, eff: 0.85,
+           damp: 1.0, mass: 5, len: 0.7 };
+var rg = { P: 40, I: 0, D: 8, G: idealKG(rc) };
+var REAL = { loopHz: 50, delay: 0.020, noise: 0.3 * Math.PI / 180,
+             backlash: 0.5 * Math.PI / 180, stiction: 3 };
+
+var ideal = simulateReal(rc, rg, {});
+var real = simulateReal(rc, rg, REAL);
+check("a good tuning passes the ideal plant", ideal.ok,
+      "settle " + ideal.settle.toFixed(2) + " deg, " + ideal.flips + " wobbles");
+check("the same tuning FAILS the realistic plant", !real.ok,
+      "settle " + real.settle.toFixed(2) + " deg, " + real.flips + " wobbles");
+
+// defaults must leave behaviour untouched
+var defaultsSame = simulateReal(rc, rg, { loopHz: 500, delay: 0, noise: 0, backlash: 0, stiction: 0 });
+check("realism at defaults == ideal", Math.abs(defaultsSame.settle - ideal.settle) < 1e-9);
+
+// and it must still be winnable with the right gains
+var win = null;
+for (var p7 = 5; p7 <= 60 && !win; p7 += 5) {
+  for (var d7 = 0; d7 <= 6; d7 += 0.5) {
+    var r7 = simulateReal(rc, { P: p7, I: 0, D: d7, G: idealKG(rc) }, REAL);
+    if (r7.ok) { win = "kP=" + p7 + " kD=" + d7; break; }
+  }
+}
+check("realistic plant is still winnable", !!win, win || "no tuning found");
+
 console.log(fails === 0 ? "\nAll sandbox physics checks PASSED." : "\n" + fails + " CHECK(S) FAILED.");
+
 process.exit(fails === 0 ? 0 : 1);

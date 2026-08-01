@@ -57,6 +57,28 @@ falls - the arm asymptotes to hanging, the elevator descends at the terminal
 velocity where back-EMF braking balances gravity. `verify_sandbox.js` asserts
 this across 40 randomly generated mechanisms.
 
+### Advanced: making it hard
+
+The Sandbox plant is deliberately clean, which is why it tunes so easily. The
+Advanced panel adds what real hardware does to you: control-loop rate
+(continuous / 200 Hz / 50 Hz), sensor transport delay, sensor noise, gearbox
+backlash, and stiction. A `Use realistic preset` button sets a plausible
+roboRIO-side combination.
+
+How much it matters, measured on the same arm by sweeping kP and kD:
+
+| plant | gain pairs that work | usable kP |
+| --- | --- | --- |
+| ideal | 45.7% of the grid | 5 - 400 |
+| + 50 Hz loop | 14.4% | 5 - 90 |
+| + delay, noise, backlash, stiction | 1.9% | 5 - 30 |
+
+So the window of working gains is about 24x smaller once the plant is honest.
+Delay is the worst offender: derivative acting on stale measurements pumps
+energy in rather than damping. `verify_sandbox.js` asserts that a tuning which
+passes the ideal plant fails the realistic one, and that the defaults leave
+behaviour bit-identical to before the panel existed.
+
 ## Physics
 
 The arm is a pendulum with gravity `3.0*cos(theta)`, viscous friction, and a 12 V limit.

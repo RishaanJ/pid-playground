@@ -175,6 +175,29 @@
   .sb-f select:focus, .sb-f input:focus { outline: 2px solid var(--ink); outline-offset: -1px; border-color: transparent; }
   .sb-f.hidden { display: none; }
 
+  /* ---------- advanced (realism) ---------- */
+  .sb-adv { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--hair); }
+  .sb-adv summary {
+    font-size: var(--t-sm); font-weight: 600; color: var(--ink-2);
+    cursor: pointer; list-style: none; display: flex; align-items: center; gap: 7px;
+    padding: 3px 0;
+  }
+  .sb-adv summary::-webkit-details-marker { display: none; }
+  .sb-adv summary::before {
+    content: ""; width: 0; height: 0; flex: none;
+    border-left: 5px solid currentColor; border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transition: transform var(--dur) var(--ease);
+  }
+  .sb-adv[open] summary::before { transform: rotate(90deg); }
+  .sb-adv summary:hover { color: var(--ink); }
+  .sb-adv summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+  .sb-adv-note { margin: 8px 0 13px; font-size: var(--t-xs); color: var(--ink-3); max-width: 74ch; }
+  .sb-adv .sb-f label { text-transform: none; letter-spacing: 0; font-size: var(--t-xs); }
+  .sb-adv .sb-f label span { font-family: var(--mono); color: var(--ink); }
+  .sb-adv input[type="range"] { height: 20px; border: 0; padding: 0; }
+  .sb-adv.on summary { color: var(--c-s); }
+
   .sb-spec { margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--hair);
              display: flex; flex-wrap: wrap; gap: 18px; font-family: var(--mono);
              font-size: var(--t-xs); color: var(--ink-3); }
@@ -442,6 +465,43 @@
         <input id="sbTravel" type="number" min="0.3" max="3" step="0.05" value="1.5">
       </div>
     </div>
+
+    <details class="sb-adv" id="sbAdv">
+      <summary>Advanced &mdash; make it behave like a real robot</summary>
+      <p class="sb-adv-note">
+        Sandbox closes the loop instantly on a perfect sensor, which is why it tunes so easily.
+        Turn these on and the range of gains that actually work collapses.
+      </p>
+      <div class="sb-grid">
+        <div class="sb-f">
+          <label for="sbLoop">Control loop</label>
+          <select id="sbLoop">
+            <option value="500">Continuous (ideal)</option>
+            <option value="200">200 Hz (on the motor)</option>
+            <option value="50">50 Hz (roboRIO)</option>
+          </select>
+        </div>
+        <div class="sb-f">
+          <label for="sbDelay">Sensor delay &mdash; <span id="sbDelayV">0 ms</span></label>
+          <input id="sbDelay" type="range" min="0" max="40" step="1" value="0">
+        </div>
+        <div class="sb-f">
+          <label for="sbNoise">Sensor noise &mdash; <span id="sbNoiseV">0</span></label>
+          <input id="sbNoise" type="range" min="0" max="100" step="1" value="0">
+        </div>
+        <div class="sb-f">
+          <label for="sbBack">Backlash &mdash; <span id="sbBackV">0</span></label>
+          <input id="sbBack" type="range" min="0" max="100" step="1" value="0">
+        </div>
+        <div class="sb-f">
+          <label for="sbStic">Stiction &mdash; <span id="sbSticV">0</span></label>
+          <input id="sbStic" type="range" min="0" max="100" step="1" value="0">
+        </div>
+        <div class="sb-f" style="justify-content:flex-end">
+          <button class="btn" id="sbReal" type="button">Use realistic preset</button>
+        </div>
+      </div>
+    </details>
 
     <div class="sb-spec" id="sbSpec"></div>
   </section>
@@ -1550,7 +1610,8 @@
 
   var mode = "levels";
   var sb = { kind: "arm", motor: "NEO", motors: 2, ratio: 60, mass: 5,
-             len: 0.7, drum: 0.03, travel: 1.5, damp: 1.0 };
+             len: 0.7, drum: 0.03, travel: 1.5, damp: 1.0,
+             loopHz: 500, delay: 0, noise: 0, backlash: 0, stiction: 0 };
   var sbPos = 0, sbVel = 0, sbInt = 0, sbPrev = 0, sbTarget = 0;
 
   function freeRad(name) { return MOTORS[name].freeRpm * 2 * Math.PI / 60; }
@@ -1572,50 +1633,90 @@
   }
   function sbDamp() { return sb.kind === "arm" ? 1.0 : 6.0; }
 
+  // Advanced/realism state. sbLoad is what the world sees; sbPos is the motor
+  // side. They differ by gearbox backlash.
+  var sbHist = [], sbCtrlAcc = 1e9, sbVolts = 0, sbLoad = 0, sbSeed = 1;
+
+  function sbRnd() {           // seeded, so a given tuning behaves the same each run
+    sbSeed = (sbSeed * 1103515245 + 12345) & 0x7fffffff;
+    return sbSeed / 0x7fffffff * 2 - 1;
+  }
+
   function sbStep(dt) {
-    var err = sbTarget - sbPos;
-    sbInt += err * dt;
-    sbInt = Math.max(-50, Math.min(50, sbInt));
-    var der = (err - sbPrev) / dt;
-    sbPrev = err;
+    // ---- what the sensor reports (noise, then transport delay) ----
+    var meas = sbLoad;
+    if (sb.noise > 0) meas += sbRnd() * sb.noise;
+    sbHist.push(meas);
+    var back = Math.round(sb.delay / dt);
+    var sensed = sbHist[Math.max(0, sbHist.length - 1 - back)];
 
-    var grav = sb.kind === "arm" ? Math.cos(sbPos) : 1;
-    terms.p = gains.P * err;
-    terms.i = gains.I * sbInt;
-    terms.d = gains.D * der;
-    terms.g = gains.G * grav;
-    terms.s = gains.S * (sbVel > 1e-4 ? 1 : sbVel < -1e-4 ? -1 : 0);
-    terms.v = gains.V * sbVel;
+    // ---- controller, running at its own rate ----
+    var period = 1 / sb.loopHz;
+    sbCtrlAcc += dt;
+    if (sbCtrlAcc >= period - 1e-9) {
+      sbCtrlAcc = 0;
+      var err = sbTarget - sensed;
+      sbInt += err * period;
+      sbInt = Math.max(-50, Math.min(50, sbInt));
+      var der = (err - sbPrev) / period;
+      sbPrev = err;
 
-    var volts = terms.p + terms.i + terms.d + terms.g + terms.s + terms.v;
-    volts = Math.max(-VMAX, Math.min(VMAX, volts));
-    terms.out = volts;
+      var grav = sb.kind === "arm" ? Math.cos(sensed) : 1;
+      terms.p = gains.P * err;
+      terms.i = gains.I * sbInt;
+      terms.d = gains.D * der;
+      terms.g = gains.G * grav;
+      terms.s = gains.S * (sbVel > 1e-4 ? 1 : sbVel < -1e-4 ? -1 : 0);
+      terms.v = gains.V * sbVel;
 
-    var tau = sbMechTorque(volts, sbVel), acc2;
-    if (sb.kind === "arm") {
-      var J = sb.mass * sb.len * sb.len;
-      acc2 = (tau - sb.mass * G_ACC * sb.len * Math.cos(sbPos) - sbDamp() * sbVel) / J;
-    } else {
-      acc2 = (tau / sb.drum - sb.mass * G_ACC - sbDamp() * sbVel) / sb.mass;
+      sbVolts = terms.p + terms.i + terms.d + terms.g + terms.s + terms.v;
+      sbVolts = Math.max(-VMAX, Math.min(VMAX, sbVolts));
     }
-    sbVel += acc2 * dt;
+    terms.out = sbVolts;
+
+    // ---- plant ----
+    var tau = sbMechTorque(sbVolts, sbVel), net, inertia;
+    if (sb.kind === "arm") {
+      inertia = sb.mass * sb.len * sb.len;
+      net = tau - sb.mass * G_ACC * sb.len * Math.cos(sbLoad) - sbDamp() * sbVel;
+    } else {
+      inertia = sb.mass;
+      net = tau / sb.drum - sb.mass * G_ACC - sbDamp() * sbVel;
+    }
+
+    // static friction: below the break-away threshold, nothing moves at all
+    if (sb.stiction > 0) {
+      if (Math.abs(sbVel) < 1e-3 && Math.abs(net) < sb.stiction) net = 0;
+      else if (Math.abs(sbVel) >= 1e-3) net -= sb.stiction * (sbVel > 0 ? 1 : -1);
+    }
+
+    sbVel += (net / inertia) * dt;
     sbPos += sbVel * dt;
 
+    // gearbox play: the load only follows once the slack is taken up
+    if (sb.backlash > 0) {
+      var half = sb.backlash / 2;
+      if (sbPos - sbLoad > half) sbLoad = sbPos - half;
+      else if (sbLoad - sbPos > half) sbLoad = sbPos + half;
+    } else sbLoad = sbPos;
+
     if (sb.kind === "arm") {
-      if (sbPos < -Math.PI / 2) { sbPos = -Math.PI / 2; if (sbVel < 0) sbVel = 0; }
-      if (sbPos > Math.PI / 2) { sbPos = Math.PI / 2; if (sbVel > 0) sbVel = 0; }
+      if (sbLoad < -Math.PI / 2) { sbLoad = sbPos = -Math.PI / 2; if (sbVel < 0) sbVel = 0; }
+      if (sbLoad > Math.PI / 2) { sbLoad = sbPos = Math.PI / 2; if (sbVel > 0) sbVel = 0; }
     } else {
-      if (sbPos < 0) { sbPos = 0; if (sbVel < 0) sbVel = 0; }
-      if (sbPos > sb.travel) { sbPos = sb.travel; if (sbVel > 0) sbVel = 0; }
+      if (sbLoad < 0) { sbLoad = sbPos = 0; if (sbVel < 0) sbVel = 0; }
+      if (sbLoad > sb.travel) { sbLoad = sbPos = sb.travel; if (sbVel > 0) sbVel = 0; }
     }
     return sbTarget;
   }
 
   function sbStart() {
     sbPos = sb.kind === "arm" ? -Math.PI / 2 : 0;
+    sbLoad = sbPos;
     sbVel = 0; sbInt = 0;
     sbTarget = sb.kind === "arm" ? Math.PI / 3 : sb.travel * 0.6;
     sbPrev = sbTarget - sbPos;
+    sbHist.length = 0; sbCtrlAcc = 1e9; sbVolts = 0; sbSeed = 1;
     trace.length = 0; rec.length = 0;
     testT = 0; idleT = 0; scored = false;
   }
@@ -1699,6 +1800,36 @@
     $("sbTravel").value = sb.travel;
   }
 
+  // Advanced sliders are 0-100 so one control serves both mechanisms; each maps
+  // onto a sensible physical range for the kind currently selected.
+  function sbAdvFromForm() {
+    var arm = sb.kind === "arm";
+    sb.loopHz = parseFloat($("sbLoop").value) || 500;
+    sb.delay = (parseFloat($("sbDelay").value) || 0) / 1000;
+
+    var nMax = arm ? 1.2 * Math.PI / 180 : 0.006;      // 1.2 deg or 6 mm
+    var bMax = arm ? 2.0 * Math.PI / 180 : 0.008;      // 2 deg or 8 mm
+    var sMax = arm ? sb.mass * G_ACC * sb.len * 0.5    // half the holding load
+                   : sb.mass * G_ACC * 0.4;
+    sb.noise = (parseFloat($("sbNoise").value) || 0) / 100 * nMax;
+    sb.backlash = (parseFloat($("sbBack").value) || 0) / 100 * bMax;
+    sb.stiction = (parseFloat($("sbStic").value) || 0) / 100 * sMax;
+
+    $("sbDelayV").textContent = Math.round(sb.delay * 1000) + " ms";
+    $("sbNoiseV").textContent = arm
+      ? (sb.noise * 180 / Math.PI).toFixed(2) + " deg"
+      : (sb.noise * 1000).toFixed(1) + " mm";
+    $("sbBackV").textContent = arm
+      ? (sb.backlash * 180 / Math.PI).toFixed(2) + " deg"
+      : (sb.backlash * 1000).toFixed(1) + " mm";
+    $("sbSticV").textContent = arm
+      ? sb.stiction.toFixed(1) + " N\u00b7m"
+      : sb.stiction.toFixed(0) + " N";
+
+    var on = sb.loopHz < 500 || sb.delay > 0 || sb.noise > 0 || sb.backlash > 0 || sb.stiction > 0;
+    $("sbAdv").classList.toggle("on", on);
+  }
+
   function sbFromForm() {
     sb.kind = $("sbKind").value;
     sb.motor = $("sbMotor").value;
@@ -1708,6 +1839,7 @@
     sb.len = Math.max(0.05, parseFloat($("sbLen").value) || 0.5);
     sb.drum = Math.max(0.005, parseFloat($("sbDrum").value) || 0.03);
     sb.travel = Math.max(0.2, parseFloat($("sbTravel").value) || 1);
+    sbAdvFromForm();
   }
 
   // Slider ranges have to follow the mechanism: an elevator in metres needs
@@ -1779,8 +1911,20 @@
       sel.appendChild(o);
     }
     sel.value = sb.motor;
-    ["sbKind", "sbMotor", "sbCount", "sbRatio", "sbMass", "sbLen", "sbDrum", "sbTravel"]
-      .forEach(function (id) { $(id).addEventListener("change", sbApply); });
+    ["sbKind", "sbMotor", "sbCount", "sbRatio", "sbMass", "sbLen", "sbDrum", "sbTravel",
+     "sbLoop"].forEach(function (id) { $(id).addEventListener("change", sbApply); });
+    ["sbDelay", "sbNoise", "sbBack", "sbStic"].forEach(function (id) {
+      $(id).addEventListener("input", function () { sbAdvFromForm(); sbStart(); });
+    });
+    $("sbReal").addEventListener("click", function () {
+      $("sbLoop").value = "50";
+      $("sbDelay").value = 20;    // ~1 CAN round trip
+      $("sbNoise").value = 25;
+      $("sbBack").value = 25;
+      $("sbStic").value = 20;
+      $("sbAdv").open = true;
+      sbApply();
+    });
     $("sbGen").addEventListener("click", function () {
       var v = $("sbSeed").value.trim();
       if (v) sbAssign(v);
@@ -1856,8 +2000,8 @@
         sAcc += SUB;
         if (sAcc >= SAMPLE) {
           sAcc -= SAMPLE;
-          trace.push({ t: testT, a: sbPos, c: sbTarget, o: terms.out });
-          rec.push({ t: testT, a: sbPos, target: sbTarget });
+          trace.push({ t: testT, a: sbLoad, c: sbTarget, o: terms.out });
+          rec.push({ t: testT, a: sbLoad, target: sbTarget });
         }
       } else if (testT >= SB_DUR) {
         if (!scored) { scored = true; sbJudge(sbMetrics()); }
@@ -1897,20 +2041,20 @@
 
       x.strokeStyle = "#C2255C"; x.lineWidth = 7; x.lineCap = "round";
       x.beginPath(); x.moveTo(px, py);
-      x.lineTo(px + Math.cos(sbPos) * len, py - Math.sin(sbPos) * len);
+      x.lineTo(px + Math.cos(sbLoad) * len, py - Math.sin(sbLoad) * len);
       x.stroke();
 
       x.fillStyle = "#E05C87";
       x.beginPath();
-      x.arc(px + Math.cos(sbPos) * len, py - Math.sin(sbPos) * len, 9, 0, Math.PI * 2);
+      x.arc(px + Math.cos(sbLoad) * len, py - Math.sin(sbLoad) * len, 9, 0, Math.PI * 2);
       x.fill();
       x.fillStyle = "#0A0A0B";
       x.beginPath(); x.arc(px, py, 5.5, 0, Math.PI * 2); x.fill();
 
-      $("angleOut").textContent = (sbPos * 180 / Math.PI).toFixed(1) + "\u00b0";
+      $("angleOut").textContent = (sbLoad * 180 / Math.PI).toFixed(1) + "\u00b0";
     } else {
       drawElevator(d, x);
-      $("angleOut").textContent = (sbPos * 100).toFixed(1) + " cm";
+      $("angleOut").textContent = (sbLoad * 100).toFixed(1) + " cm";
     }
   }
 
@@ -1929,7 +2073,7 @@
     x.setLineDash([]);
 
     // carriage
-    var cy = yOf(sbPos);
+    var cy = yOf(sbLoad);
     x.fillStyle = "#C2255C";
     x.beginPath();
     if (x.roundRect) x.roundRect(railX - 26, cy - 15, 52, 30, 5);
@@ -1940,7 +2084,7 @@
 
     x.fillStyle = "#0A0A0B";
     x.font = "600 26px " + "-apple-system, system-ui, sans-serif";
-    x.fillText((sbPos * 100).toFixed(1) + " cm", railX + 92, cy + 4);
+    x.fillText((sbLoad * 100).toFixed(1) + " cm", railX + 92, cy + 4);
     x.fillStyle = "#6B6B73";
     x.font = "12px " + "'SF Mono', ui-monospace, Menlo, monospace";
     x.fillText("target " + (sbTarget * 100).toFixed(0) + " cm", railX + 92, cy + 24);

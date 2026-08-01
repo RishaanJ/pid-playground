@@ -312,12 +312,31 @@
   .gain-name { flex: 1; font-size: var(--t-sm); font-weight: 640; letter-spacing: -0.005em; }
   .gain-name i { font-style: normal; font-weight: 400; color: var(--ink-3); }
 
+  /* the value is typeable - dragging a slider to an exact gain is miserable */
   .gain-val {
     font-family: var(--mono);
     font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
     color: var(--ink);
+    width: 78px;
+    text-align: right;
+    padding: 3px 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    -moz-appearance: textfield;
+    appearance: textfield;
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
   }
+  .gain-val::-webkit-outer-spin-button,
+  .gain-val::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .gain-val:hover { border-color: var(--hair); }
+  .gain-val:focus {
+    outline: none;
+    border-color: var(--ink);
+    background: var(--card);
+  }
+  .gain-val.out-of-range { border-color: var(--bad); color: var(--bad); }
 
   .gain-help { margin: 0; font-size: var(--t-xs); color: var(--ink-3); }
 
@@ -560,54 +579,54 @@
         <div class="gain" id="gP" style="--accent-c: var(--c-p);">
           <div class="gain-top">
             <span class="gain-name" style="color:var(--c-p)">kP <i>push</i></span>
-            <span class="gain-val" id="vP">0.0</span>
+            <input class="gain-val" id="vP" type="number" step="any" inputmode="decimal" aria-label="kP value" autocomplete="off">
           </div>
-          <input type="range" id="kP" min="0" max="24" step="0.1" value="0" aria-label="kP proportional gain">
+          <input type="range" id="kP" min="0" max="24" step="any" value="0" aria-label="kP proportional gain">
           <p class="gain-help">Push, proportional to how far off it is.</p>
         </div>
 
         <div class="gain" id="gI" style="--accent-c: var(--c-i);">
           <div class="gain-top">
             <span class="gain-name" style="color:var(--c-i)">kI <i>patience</i></span>
-            <span class="gain-val" id="vI">0.00</span>
+            <input class="gain-val" id="vI" type="number" step="any" inputmode="decimal" aria-label="kI value" autocomplete="off">
           </div>
-          <input type="range" id="kI" min="0" max="5" step="0.05" value="0" aria-label="kI integral gain">
+          <input type="range" id="kI" min="0" max="5" step="any" value="0" aria-label="kI integral gain">
           <p class="gain-help">Grinds out an error that won&rsquo;t budge.</p>
         </div>
 
         <div class="gain" id="gD" style="--accent-c: var(--c-d);">
           <div class="gain-top">
             <span class="gain-name" style="color:var(--c-d)">kD <i>brakes</i></span>
-            <span class="gain-val" id="vD">0.00</span>
+            <input class="gain-val" id="vD" type="number" step="any" inputmode="decimal" aria-label="kD value" autocomplete="off">
           </div>
-          <input type="range" id="kD" min="0" max="5" step="0.05" value="0" aria-label="kD derivative gain">
+          <input type="range" id="kD" min="0" max="5" step="any" value="0" aria-label="kD derivative gain">
           <p class="gain-help">Brakes. Amplifies sensor noise.</p>
         </div>
 
         <div class="gain" id="gG" style="--accent-c: var(--c-g);">
           <div class="gain-top">
             <span class="gain-name" style="color:var(--c-g)">kG <i>gravity assist</i></span>
-            <span class="gain-val" id="vG">0.0</span>
+            <input class="gain-val" id="vG" type="number" step="any" inputmode="decimal" aria-label="kG value" autocomplete="off">
           </div>
-          <input type="range" id="kG" min="0" max="5" step="0.1" value="0" aria-label="kG gravity feedforward">
+          <input type="range" id="kG" min="0" max="5" step="any" value="0" aria-label="kG gravity feedforward">
           <p class="gain-help">Holds the arm&rsquo;s weight up front.</p>
         </div>
 
         <div class="gain hidden" id="gV" style="--accent-c: var(--c-i);">
           <div class="gain-top">
             <span class="gain-name" style="color:var(--c-i)">kV <i>feedforward</i></span>
-            <span class="gain-val" id="vV">0.00</span>
+            <input class="gain-val" id="vV" type="number" step="any" inputmode="decimal" aria-label="kV value" autocomplete="off">
           </div>
-          <input type="range" id="kV" min="0" max="4" step="0.01" value="0" aria-label="kV velocity feedforward">
+          <input type="range" id="kV" min="0" max="4" step="any" value="0" aria-label="kV velocity feedforward">
           <p class="gain-help">Volts per 1000 RPM. Predicts the speed.</p>
         </div>
 
         <div class="gain hidden" id="gS" style="--accent-c: var(--c-s);">
           <div class="gain-top">
             <span class="gain-name" style="color:var(--c-s)">kS <i>unstick</i></span>
-            <span class="gain-val" id="vS">0.0</span>
+            <input class="gain-val" id="vS" type="number" step="any" inputmode="decimal" aria-label="kS value" autocomplete="off">
           </div>
-          <input type="range" id="kS" min="0" max="3" step="0.05" value="0" aria-label="kS static friction feedforward">
+          <input type="range" id="kS" min="0" max="3" step="any" value="0" aria-label="kS static friction feedforward">
           <p class="gain-help">A nudge to break friction.</p>
         </div>
       </div>
@@ -1036,11 +1055,11 @@
       if (on && L.range && L.range[k]) {
         sliders[k].min = L.range[k][0];
         sliders[k].max = L.range[k][1];
-        sliders[k].step = L.range[k][2];
+        sliders[k].step = "any";     // typed values must not snap to the drag step
       } else if (on && DEFAULT_RANGE[k]) {
         sliders[k].min = DEFAULT_RANGE[k][0];
         sliders[k].max = DEFAULT_RANGE[k][1];
-        sliders[k].step = DEFAULT_RANGE[k][2];
+        sliders[k].step = "any";
       }
       if (!on) { sliders[k].value = 0; }
     });
@@ -1101,18 +1120,53 @@
     $("diagFb").hidden = false;
   }
 
-  function readSliders() {
-    KEYS.forEach(function (k) { gains[k] = parseFloat(sliders[k].value); });
-    vals.P.textContent = gains.P.toFixed(1);
-    vals.I.textContent = gains.I.toFixed(2);
-    vals.D.textContent = gains.D.toFixed(2);
-    vals.G.textContent = gains.G.toFixed(1);
-    vals.S.textContent = gains.S.toFixed(1);
-    vals.V.textContent = gains.V.toFixed(2);
+  var DP = { P: 1, I: 2, D: 2, G: 1, S: 1, V: 2 };
+
+  // Show the tidy fixed-decimal form when it is exact, otherwise show the real
+  // number - a typed 1.554 must never be displayed as 1.6.
+  function fmtGain(k, v) {
+    var r = Math.round(v * 1000) / 1000;
+    var d = r.toFixed(DP[k]);
+    return Math.abs(parseFloat(d) - r) < 1e-9 ? d : String(r);
   }
 
+  function readSliders() {
+    KEYS.forEach(function (k) { gains[k] = parseFloat(sliders[k].value); });
+    KEYS.forEach(function (k) {
+      // never rewrite the box someone is typing into
+      if (document.activeElement !== vals[k]) vals[k].value = fmtGain(k, gains[k]);
+    });
+  }
+
+  // Typed values drive the slider, clamped to the range this level or
+  // mechanism allows. Out-of-range input is flagged rather than silently eaten.
   KEYS.forEach(function (k) {
-    sliders[k].addEventListener("input", function () { readSliders(); restart(); });
+    vals[k].addEventListener("input", function () {
+      var raw = vals[k].value.trim();
+      if (raw === "" || raw === "-" || raw === ".") return;   // mid-typing
+      var v = parseFloat(raw);
+      if (isNaN(v)) return;
+      var lo = parseFloat(sliders[k].min), hi = parseFloat(sliders[k].max);
+      vals[k].classList.toggle("out-of-range", v < lo || v > hi);
+      sliders[k].value = Math.max(lo, Math.min(hi, v));
+      readSliders();
+      restart();
+    });
+    vals[k].addEventListener("blur", function () {
+      vals[k].classList.remove("out-of-range");
+      vals[k].value = fmtGain(k, gains[k]);                   // tidy up on exit
+    });
+    vals[k].addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); vals[k].blur(); }
+    });
+  });
+
+  KEYS.forEach(function (k) {
+    sliders[k].addEventListener("input", function () {
+      // continuous slider: round to 3 dp so the shown value IS the value used
+      sliders[k].value = Math.round(parseFloat(sliders[k].value) * 1000) / 1000;
+      readSliders(); restart();
+    });
   });
 
   $("mm").addEventListener("change", function (e) { motionMagic = e.target.checked; startTest(); });
@@ -1868,7 +1922,7 @@
     KEYS.forEach(function (k) {
       var el = sliders[k];
       var cur = parseFloat(el.value) || 0;
-      el.min = 0; el.max = r[k]; el.step = r[k] / 500;
+      el.min = 0; el.max = r[k]; el.step = "any";
       el.value = Math.min(cur, r[k]);
       $("g" + k).classList.remove("hidden");
       var t = $("term" + k); if (t) t.classList.remove("hidden");

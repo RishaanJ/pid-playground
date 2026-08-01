@@ -2030,9 +2030,20 @@
       $("sbAdv").open = true;
       sbApply();
     });
+    // An empty box used to make this button a silent no-op. Roll a code
+    // instead, and show it, so the click always does something and the
+    // mechanism stays reproducible from what is on screen.
+    function randomCode() {
+      var A = "ABCDEFGHJKLMNPQRSTUVWXYZ", N = "23456789", s = "";
+      for (var i = 0; i < 2; i++) s += A.charAt(Math.floor(Math.random() * A.length));
+      for (var j = 0; j < 2; j++) s += N.charAt(Math.floor(Math.random() * N.length));
+      return s;
+    }
+
     $("sbGen").addEventListener("click", function () {
       var v = $("sbSeed").value.trim();
-      if (v) sbAssign(v);
+      if (!v) { v = randomCode(); $("sbSeed").value = v; }
+      sbAssign(v);
     });
     $("sbSeed").addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); $("sbGen").click(); }

@@ -711,7 +711,7 @@
     {
       name: "Lift the arm",
       what: "Gravity pulls the arm down. Push it up to the gold line.",
-      goal: "Get the arm to the target, within <b>10&deg;</b>.",
+      goal: "Get the arm to the target, within <b>10\u00b0</b>.",
       hint: "Only kP matters. Drag it up until the arm reaches the line.",
       env: {}, dur: 6, gains: ["P", "I", "D", "G"],
       pass: function (m) { return m.minErr < 10; },
@@ -720,16 +720,16 @@
     {
       name: "Stop the bounce",
       what: "Now arrive under control instead of slamming into place.",
-      goal: "Reach the target and overshoot by less than <b>5&deg;</b>.",
-      hint: "Raise kP for speed, then add kD &mdash; the brakes.",
+      goal: "Reach the target and overshoot by less than <b>5\u00b0</b>.",
+      hint: "Raise kP for speed, then add kD \u2014 the brakes.",
       env: {}, dur: 6, gains: ["P", "I", "D", "G"],
       pass: function (m) { return m.minErr < 10 && m.overshoot < 5; },
       why: "kD damps the approach so a high kP stops being dangerous."
     },
     {
       name: "Kill the sag",
-      what: "It stops just short and stays there &mdash; kP's push shrinks with the gap until gravity balances it.",
-      goal: "Settle within <b>1&deg;</b> of the line.",
+      what: "It stops just short and stays there \u2014 kP's push shrinks with the gap until gravity balances it.",
+      goal: "Settle within <b>1\u00b0</b> of the line.",
       hint: "That gap is steady-state error. kG holds the weight so kP doesn't have to.",
       env: {}, dur: 6, gains: ["P", "I", "D", "G"],
       pass: function (m) { return m.settleErr < 1; },
@@ -738,7 +738,7 @@
     {
       name: "Smooth operator",
       what: "A step command slams the motor to full power. Motion Magic ramps the target instead.",
-      goal: "With <b>Motion Magic on</b>, settle within 1&deg; and overshoot under 4&deg;.",
+      goal: "With <b>Motion Magic on</b>, settle within 1\u00b0 and overshoot under 4\u00b0.",
       hint: "Keep your gains and tick Motion Magic. A dip before the climb is kG's job.",
       env: {}, dur: 7, gains: ["P", "I", "D", "G"], needMM: true,
       pass: function (m) { return m.settleErr < 1 && m.overshoot < 4; },
@@ -746,8 +746,8 @@
     },
     {
       name: "Noisy encoder",
-      what: "The encoder reading jitters, and kD divides by time &mdash; so it multiplies that noise.",
-      goal: "Settle within 2&deg; <b>and</b> keep the motor from buzzing (jitter under 1.0).",
+      what: "The encoder reading jitters, and kD divides by time \u2014 so it multiplies that noise.",
+      goal: "Settle within 2\u00b0 <b>and</b> keep the motor from buzzing (jitter under 1.0).",
       hint: "Turn kD down to 0.5 or less. Lean on kG and Motion Magic instead.",
       env: { noise: { tick: 0.006, sigma: 0.0025 } }, dur: 7, gains: ["P", "I", "D", "G"],
       pass: function (m) { return m.settleErr < 2 && m.chatter < 1.0; },
@@ -756,16 +756,16 @@
     {
       name: "Sticky gearbox",
       what: "Static friction. Small commands do nothing until you push hard enough to break loose.",
-      goal: "Settle within <b>1.5&deg;</b> despite the stiction.",
-      hint: "kS is now unlocked &mdash; a constant nudge. Around 1.0&ndash;1.5 breaks friction.",
+      goal: "Settle within <b>1.5\u00b0</b> despite the stiction.",
+      hint: "kS is now unlocked \u2014 a constant nudge. Around 1.0\u20131.5 breaks friction.",
       env: { stiction: 1.1 }, dur: 7, gains: ["P", "I", "D", "G", "S"],
       pass: function (m) { return m.settleErr < 1.5; },
       why: "kS is to friction what kG is to gravity."
     },
     {
       name: "Brownout battery",
-      what: "Push past 8&nbsp;V for long and the battery sags to 7&nbsp;V. On a real robot that costs you the match.",
-      goal: "Settle within 1.5&deg; <b>without ever browning out</b>.",
+      what: "Push past 8\u00a0V for long and the battery sags to 7\u00a0V. On a real robot that costs you the match.",
+      goal: "Settle within 1.5\u00b0 <b>without ever browning out</b>.",
       hint: "Stop slamming the motor. Motion Magic plus kG keeps demand low.",
       env: { brownout: { thresh: 8, sagged: 7 } }, dur: 7, gains: ["P", "I", "D", "G", "S"],
       pass: function (m) { return m.settleErr < 1.5 && !m.browned; },
@@ -774,8 +774,8 @@
     {
       name: "Game piece",
       what: "Three seconds in it grabs a game piece and doubles in weight, so your kG is now wrong.",
-      goal: "Recover to within <b>3&deg;</b> and hold it.",
-      hint: "kG can't know about the game piece, but kI can. Try kI around 3&ndash;5.",
+      goal: "Recover to within <b>3\u00b0</b> and hold it.",
+      hint: "kG can't know about the game piece, but kI can. Try kI around 3\u20135.",
       env: { massAt: { t: 3.0, mul: 2.2 } }, dur: 10, gains: ["P", "I", "D", "G", "S"],
       pass: function (m) { return m.worstLate < 3; },
       why: "Feedforward handles what you can predict; integral handles what you can't."
@@ -783,7 +783,7 @@
     {
       name: "Playing defense",
       what: "A defender shoves the arm every 1.5 seconds.",
-      goal: "Never get knocked more than <b>6&deg;</b> off target in the last stretch.",
+      goal: "Never get knocked more than <b>6\u00b0</b> off target in the last stretch.",
       hint: "Stiff and well damped: high kP to snap back, enough kD to stop the ringing.",
       env: { disturb: { every: 1.5, mag: 7 } }, dur: 8, gains: ["P", "I", "D", "G", "S"],
       pass: function (m) { return m.worstLate < 6; },
@@ -791,8 +791,8 @@
     },
     {
       name: "Match sequence",
-      what: "Stow, score low, score high &mdash; three positions back to back.",
-      goal: "Hit <b>every</b> position within 3&deg; before the next one is called.",
+      what: "Stow, score low, score high \u2014 three positions back to back.",
+      goal: "Hit <b>every</b> position within 3\u00b0 before the next one is called.",
       hint: "Keep the gains that survived. Motion Magic still arrives on time.",
       env: { sequence: [{ t: 0, ang: 60 }, { t: 2.5, ang: 12 }, { t: 5, ang: 85 }] },
       dur: 8, gains: ["P", "I", "D", "G", "S"],
@@ -1048,7 +1048,7 @@
     readSliders();
     renderRail();
     scrollActiveIntoView();
-    setResult("idle", "Ready", "Drag a slider &mdash; the test runs itself.");
+    setResult("idle", "Ready", "Drag a slider \u2014 the test runs itself.");
     startTest();
   }
 
@@ -1366,7 +1366,7 @@
       renderRail();
       var next = level + 1 < LEVELS.length
         ? " Level " + (level + 2) + " (<b>" + LEVELS[level + 1].name + "</b>) is unlocked."
-        : " That's all ten &mdash; you've tuned through every failure mode a real arm throws at you.";
+        : " That's all ten \u2014 you've tuned through every failure mode a real arm throws at you.";
       var extra = (motionMagic && m.earlyDip < -1.5)
         ? " <br><br>One thing worth fixing anyway: " + sagNote(m)
         : "";
@@ -1380,26 +1380,26 @@
   // The arm dipping before it climbs is the classic Motion Magic surprise, so it
   // gets its own explanation rather than being lumped in with ordinary error.
   function sagNote(m) {
-    return "It sags " + Math.abs(m.earlyDip).toFixed(1) + "&deg; first because Motion Magic starts the profile " +
-      "<b>where the arm already is</b> &mdash; error begins at zero, so P, I and D all output nothing. " +
+    return "It sags " + Math.abs(m.earlyDip).toFixed(1) + "\u00b0 first because Motion Magic starts the profile " +
+      "<b>where the arm already is</b> \u2014 error begins at zero, so P, I and D all output nothing. " +
       "Only <b>kG</b> works without error. Raise it to about <b>3.0</b>.";
   }
 
   function explain(m) {
     var L = LEVELS[level];
     if (gains.P === 0 && gains.I === 0) {
-      return "Nothing is pushing &mdash; kP and kI are both zero, so gravity just wins. Start with <b>kP</b>.";
+      return "Nothing is pushing \u2014 kP and kI are both zero, so gravity just wins. Start with <b>kP</b>.";
     }
     if (motionMagic && m.earlyDip < -1.5) return sagNote(m);
     if (m.minErr > 25) return "It never gets near the target. Raise <b>kP</b>, or add <b>kG</b> so it stops fighting its own weight.";
-    if (L.env.noise && m.chatter >= 1.0) return "The motor is buzzing (jitter " + m.chatter.toFixed(2) + "). <b>kD</b> is amplifying the encoder noise &mdash; turn it down.";
+    if (L.env.noise && m.chatter >= 1.0) return "The motor is buzzing (jitter " + m.chatter.toFixed(2) + "). <b>kD</b> is amplifying the encoder noise \u2014 turn it down.";
     if (L.env.brownout && m.browned) return "You browned out the battery. Cut the peak demand: lower <b>kP</b>, lean on <b>kG</b>, and try <b>Motion Magic</b>.";
-    if (m.overshoot > 5) return "Overshooting by " + m.overshoot.toFixed(0) + "&deg;. Add <b>kD</b> to brake on the way in.";
-    if (L.env.massAt && m.worstLate > 3) return "The game piece is dragging it down by " + m.worstLate.toFixed(1) + "&deg;. <b>kG</b> can't know about it &mdash; raise <b>kI</b> so the error gets absorbed.";
-    if (L.env.disturb && m.worstLate > 6) return "The hits are knocking you " + m.worstLate.toFixed(1) + "&deg; off. Stiffen up: more <b>kP</b>, with enough <b>kD</b> to stop the ringing.";
-    if (L.env.sequence && m.waypointErr > 3) return "Missing a waypoint by " + m.waypointErr.toFixed(1) + "&deg;. It needs to arrive before the next position is called.";
-    if (L.env.stiction && m.settleErr > 1.5) return "Friction has it stuck " + m.settleErr.toFixed(1) + "&deg; out. Add <b>kS</b> to break it loose, or <b>kI</b> to grind through.";
-    if (m.settleErr > 1) return "Settling " + m.settleErr.toFixed(1) + "&deg; short &mdash; that's steady-state error. Add <b>kG</b>, or a little <b>kI</b>.";
+    if (m.overshoot > 5) return "Overshooting by " + m.overshoot.toFixed(0) + "\u00b0. Add <b>kD</b> to brake on the way in.";
+    if (L.env.massAt && m.worstLate > 3) return "The game piece is dragging it down by " + m.worstLate.toFixed(1) + "\u00b0. <b>kG</b> can't know about it \u2014 raise <b>kI</b> so the error gets absorbed.";
+    if (L.env.disturb && m.worstLate > 6) return "The hits are knocking you " + m.worstLate.toFixed(1) + "\u00b0 off. Stiffen up: more <b>kP</b>, with enough <b>kD</b> to stop the ringing.";
+    if (L.env.sequence && m.waypointErr > 3) return "Missing a waypoint by " + m.waypointErr.toFixed(1) + "\u00b0. It needs to arrive before the next position is called.";
+    if (L.env.stiction && m.settleErr > 1.5) return "Friction has it stuck " + m.settleErr.toFixed(1) + "\u00b0 out. Add <b>kS</b> to break it loose, or <b>kI</b> to grind through.";
+    if (m.settleErr > 1) return "Settling " + m.settleErr.toFixed(1) + "\u00b0 short \u2014 that's steady-state error. Add <b>kG</b>, or a little <b>kI</b>.";
     return "So close. Nudge the gain the hint mentions and run it once more.";
   }
 
@@ -1535,9 +1535,26 @@
 
     var padL = 30, padR = 8, padT = 8, padB = 14;
     var pw = d.w - padL - padR, ph = d.h - padT - padB;
-    var fw = LEVELS[level].env.plant === "flywheel";
-    var lo = fw ? 0 : -25, hi = fw ? 5200 : 105;
-    var dur = LEVELS[level].dur;
+
+    // The axis has to follow the plant: degrees for an arm, RPM for a
+    // flywheel, centimetres for an elevator.
+    var sandboxEl = mode === "sandbox" && sb.kind === "elevator";
+    var fw = mode !== "sandbox" && LEVELS[level].env.plant === "flywheel";
+    var conv = sandboxEl ? 100 : (fw ? 1 : DEG);      // stored units -> display
+    var lo, hi, grid, suffix;
+
+    if (fw) {
+      lo = 0; hi = 5200; grid = [0, 2000, 4000]; suffix = "k";
+    } else if (sandboxEl) {
+      var top = sb.travel * 100;
+      lo = -top * 0.08; hi = top * 1.12;
+      grid = [0, top * 0.25, top * 0.5, top * 0.75, top];
+      suffix = "cm";
+    } else {
+      lo = -25; hi = 105; grid = [0, 30, 60, 90]; suffix = "\u00b0";
+    }
+    var dur = mode === "sandbox" ? SB_DUR : LEVELS[level].dur;
+    var band = (hi - lo) * 0.17;                      // how tall the motor trace sits
 
     function yOf(v) { return padT + ph * (1 - (v - lo) / (hi - lo)); }
     function xOf(t) { return padL + pw * Math.min(1, t / dur); }
@@ -1545,10 +1562,10 @@
     x.strokeStyle = "#E4E4E7"; x.lineWidth = 1;
     x.font = "10px 'SF Mono', ui-monospace, Menlo, monospace";
     x.fillStyle = "#6B6B73";
-    (fw ? [0, 2000, 4000] : [0, 30, 60, 90]).forEach(function (g) {
+    grid.forEach(function (g) {
       var yy = Math.round(yOf(g)) + 0.5;
       x.beginPath(); x.moveTo(padL, yy); x.lineTo(d.w - padR, yy); x.stroke();
-      x.fillText(fw ? (g / 1000) + "k" : g + "\u00b0", 2, yy + 3);
+      x.fillText(fw ? (g / 1000) + suffix : Math.round(g) + suffix, 2, yy + 3);
     });
 
     if (trace.length < 2) return;
@@ -1557,7 +1574,7 @@
     x.strokeStyle = "#0F766E"; x.globalAlpha = 0.5; x.lineWidth = 1.2;
     x.beginPath();
     for (var k = 0; k < trace.length; k++) {
-      var yv = yOf(lo + (trace[k].o / VMAX + 1) / 2 * (fw ? 900 : 22));
+      var yv = yOf(lo + (trace[k].o / VMAX + 1) / 2 * band);
       if (k === 0) x.moveTo(xOf(trace[k].t), yv); else x.lineTo(xOf(trace[k].t), yv);
     }
     x.stroke(); x.globalAlpha = 1;
@@ -1565,7 +1582,7 @@
     x.strokeStyle = "#B45309"; x.lineWidth = 2;
     x.beginPath();
     for (var i = 0; i < trace.length; i++) {
-      var y1 = yOf(fw ? trace[i].c : trace[i].c * DEG);
+      var y1 = yOf(trace[i].c * conv);
       if (i === 0) x.moveTo(xOf(trace[i].t), y1); else x.lineTo(xOf(trace[i].t), y1);
     }
     x.stroke();
@@ -1573,14 +1590,14 @@
     x.strokeStyle = "#C2255C"; x.lineWidth = 2.5;
     x.beginPath();
     for (var j = 0; j < trace.length; j++) {
-      var y2 = yOf(fw ? trace[j].a : trace[j].a * DEG);
+      var y2 = yOf(trace[j].a * conv);
       if (j === 0) x.moveTo(xOf(trace[j].t), y2); else x.lineTo(xOf(trace[j].t), y2);
     }
     x.stroke();
 
     var L = trace[trace.length - 1];
     x.fillStyle = "#E05C87";
-    x.beginPath(); x.arc(xOf(L.t), yOf(fw ? L.a : L.a * DEG), 3.5, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.arc(xOf(L.t), yOf(L.a * conv), 3.5, 0, Math.PI * 2); x.fill();
   }
 
   function drawTerms() {
@@ -1886,10 +1903,31 @@
     $("stageLabel").textContent = sb.kind === "arm" ? "The arm" : "The elevator";
     $("kOver").textContent = "Overshoot";
     $("legend").innerHTML =
-      '<span style="color:var(--c-i)">target</span> &nbsp; <span style="color:var(--c-p)">position</span>';
+      '<span style="color:var(--c-i)">target</span> \u00a0 <span style="color:var(--c-p)">position</span>';
     sbRanges();
     sbSpec();
+    sbHelp();
     sbStart();
+  }
+
+  // The captions are written for the arm levels; sandbox mechanisms need their
+  // own wording and units.
+  function sbHelp() {
+    var arm = sb.kind === "arm";
+    var pos = arm ? "degree" : "metre";
+    var txt = {
+      P: "Volts per " + pos + " of error.",
+      I: "Grinds out an error that won't budge.",
+      D: "Brakes. Amplifies sensor noise and delay.",
+      G: arm ? "Volts to hold the arm level against gravity."
+             : "Volts to hold the carriage against gravity.",
+      V: "Volts per " + (arm ? "rad/s" : "m/s") + " of speed.",
+      S: "A nudge to break static friction."
+    };
+    KEYS.forEach(function (k) {
+      var el = $("g" + k).querySelector(".gain-help");
+      if (el) el.textContent = txt[k];
+    });
   }
 
   function setMode(m) {
@@ -1900,10 +1938,23 @@
     $("mLevels").setAttribute("aria-selected", m === "levels");
     $("mSandbox").setAttribute("aria-selected", m === "sandbox");
     if (m === "sandbox") { sbApply(); }
-    else { selectLevel(level); }
+    else { restoreHelp(); selectLevel(level); }
+  }
+
+  // The levels' own captions, kept so switching back out of sandbox restores them.
+  var HELP0 = {};
+  function restoreHelp() {
+    KEYS.forEach(function (k) {
+      var el = $("g" + k).querySelector(".gain-help");
+      if (el && HELP0[k] !== undefined) el.textContent = HELP0[k];
+    });
   }
 
   (function initSandbox() {
+    KEYS.forEach(function (k) {
+      var el = $("g" + k).querySelector(".gain-help");
+      if (el) HELP0[k] = el.textContent;
+    });
     var sel = $("sbMotor"), names = Object.keys(MOTORS);
     for (var i = 0; i < names.length; i++) {
       var o = document.createElement("option");
@@ -2016,7 +2067,7 @@
 
     var m = sbMetrics();
     $("sOver").textContent = m.overshoot > 0.3 ? m.overshoot.toFixed(1) + sbUnit() : "0" + sbUnit();
-    $("sSettle").textContent = m.settleErr < 900 ? m.settleErr.toFixed(1) + sbUnit() : "&mdash;";
+    $("sSettle").textContent = m.settleErr < 900 ? m.settleErr.toFixed(1) + sbUnit() : "\u2014";
     $("sOut").textContent = terms.out.toFixed(1) + "V";
     $("sOut").style.color = "var(--ink)";
     $("sCh").textContent = m.chatter.toFixed(2);

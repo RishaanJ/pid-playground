@@ -35,6 +35,28 @@ only be solved with the gain the lesson is about.
 **Diagnose** — no sliders. You get a badly tuned arm and have to name the fault from the
 response curve alone, the way you would reading a plot in Phoenix Tuner. Five faults, random order.
 
+## Sandbox mode
+
+A second mode next to Levels. Instead of fixed scenarios you configure the
+mechanism itself - arm or elevator, motor and motor count, gear ratio, mass,
+length or drum radius - and tune whatever you built.
+
+Type a name or number into the assignment box and it deterministically derives
+a mechanism from it, so every student gets a different one and the same code
+always reproduces the same machine. Their gains are theirs alone: `kG` is
+`12 * m * g * L / (stall * N * ratio * eff)`, so it moves with every parameter.
+
+Sandbox runs in real SI units on a standard brushed-DC torque curve
+(`tau = tau_stall * (V/12 - omega_motor/omega_free)`), not the tuned arbitrary
+units the levels use. Slider ranges rescale with the mechanism, since an
+elevator in metres needs gains an order of magnitude larger than an arm in
+radians.
+
+With every gain at zero the motor gets exactly 0 V and the mechanism simply
+falls - the arm asymptotes to hanging, the elevator descends at the terminal
+velocity where back-EMF braking balances gravity. `verify_sandbox.js` asserts
+this across 40 randomly generated mechanisms.
+
 ## Physics
 
 The arm is a pendulum with gravity `3.0*cos(theta)`, viscous friction, and a 12 V limit.
@@ -70,6 +92,7 @@ the physics or the pass thresholds, re-run these:
 
     node verify_levels.js      # all 13 levels, 12 candidate tunings
     node verify_flywheel.js    # flywheel spin-up and shot recovery
+    node verify_sandbox.js     # sandbox physics, incl. zero gains == zero volts
 
 `verify_levels.js` mirrors the simulation exactly and prints which tunings beat each level.
 A level with no winners is a bug.

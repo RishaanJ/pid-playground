@@ -137,6 +137,49 @@
   /* everything fits - the arrows would just be noise */
   .rail-wrap.no-overflow .rail-btn { display: none; }
 
+  /* ---------- mode switch ---------- */
+  .modes { display: flex; gap: 2px; background: var(--card); border-radius: var(--r-sm);
+           box-shadow: var(--sh-1); padding: 4px; align-self: flex-start; }
+  .mode-btn { border: 0; background: none; border-radius: 6px; padding: 7px 15px;
+              font-family: var(--ui); font-size: var(--t-sm); font-weight: 550;
+              color: var(--ink-3); cursor: pointer;
+              transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
+  .mode-btn:hover:not(.on) { background: var(--page); color: var(--ink-2); }
+  .mode-btn.on { background: var(--ink); color: #FFFFFF; }
+  .mode-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+  body[data-mode="sandbox"] .rail-wrap,
+  body[data-mode="sandbox"] .brief { display: none; }
+  body[data-mode="levels"] #sandbox { display: none; }
+
+  /* ---------- sandbox config ---------- */
+  .sb-head { display: flex; justify-content: space-between; align-items: flex-start;
+             gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .sb-head h2 { font-size: var(--t-h2); font-weight: 640; margin: 0 0 3px; letter-spacing: -0.012em; }
+  .sb-head p { margin: 0; color: var(--ink-2); font-size: var(--t-sm); max-width: 60ch; }
+
+  .sb-assign { display: flex; gap: 6px; align-items: center; flex: none; }
+  .sb-assign input { font-family: var(--mono); font-size: var(--t-sm); width: 132px;
+                     padding: 8px 10px; border: 1px solid var(--hair); border-radius: var(--r-sm);
+                     background: var(--card); color: var(--ink); }
+  .sb-assign input:focus { outline: 2px solid var(--ink); outline-offset: -1px; border-color: transparent; }
+
+  .sb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .sb-f { display: flex; flex-direction: column; gap: 4px; }
+  .sb-f label { font-size: var(--t-xs); letter-spacing: 0.045em; text-transform: uppercase; color: var(--ink-3); }
+  .sb-f select, .sb-f input {
+    font-family: var(--mono); font-size: var(--t-sm); padding: 7px 9px;
+    border: 1px solid var(--hair); border-radius: var(--r-sm);
+    background: var(--card); color: var(--ink); width: 100%;
+  }
+  .sb-f select:focus, .sb-f input:focus { outline: 2px solid var(--ink); outline-offset: -1px; border-color: transparent; }
+  .sb-f.hidden { display: none; }
+
+  .sb-spec { margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--hair);
+             display: flex; flex-wrap: wrap; gap: 18px; font-family: var(--mono);
+             font-size: var(--t-xs); color: var(--ink-3); }
+  .sb-spec b { color: var(--ink); font-weight: 600; }
+
   .chip {
     flex: none;
     display: flex;
@@ -346,6 +389,62 @@
 <div class="wrap">
 
   <h1>PID Playground</h1>
+
+  <div class="modes" role="tablist" aria-label="Mode">
+    <button class="mode-btn on" id="mLevels" type="button" role="tab" aria-selected="true">Levels</button>
+    <button class="mode-btn" id="mSandbox" type="button" role="tab" aria-selected="false">Sandbox</button>
+  </div>
+
+  <section class="card" id="sandbox">
+    <div class="sb-head">
+      <div>
+        <h2>Build a mechanism, then tune it</h2>
+        <p>Real motor curves and SI units. Give each person a different assignment code
+           and they each get their own mechanism to tune.</p>
+      </div>
+      <div class="sb-assign">
+        <input id="sbSeed" type="text" placeholder="name or number" aria-label="Assignment code" autocomplete="off">
+        <button class="btn" id="sbGen" type="button">Assign</button>
+      </div>
+    </div>
+
+    <div class="sb-grid">
+      <div class="sb-f">
+        <label for="sbKind">Mechanism</label>
+        <select id="sbKind"><option value="arm">Arm</option><option value="elevator">Elevator</option></select>
+      </div>
+      <div class="sb-f">
+        <label for="sbMotor">Motor</label>
+        <select id="sbMotor"></select>
+      </div>
+      <div class="sb-f">
+        <label for="sbCount">Motors</label>
+        <select id="sbCount"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+      </div>
+      <div class="sb-f">
+        <label for="sbRatio">Gear ratio :1</label>
+        <input id="sbRatio" type="number" min="1" max="500" step="1" value="60">
+      </div>
+      <div class="sb-f">
+        <label for="sbMass" id="sbMassL">Mass (kg)</label>
+        <input id="sbMass" type="number" min="0.5" max="60" step="0.1" value="5">
+      </div>
+      <div class="sb-f" id="sbLenF">
+        <label for="sbLen">Arm length (m)</label>
+        <input id="sbLen" type="number" min="0.1" max="2" step="0.01" value="0.7">
+      </div>
+      <div class="sb-f hidden" id="sbDrumF">
+        <label for="sbDrum">Drum radius (m)</label>
+        <input id="sbDrum" type="number" min="0.005" max="0.12" step="0.001" value="0.03">
+      </div>
+      <div class="sb-f hidden" id="sbTravelF">
+        <label for="sbTravel">Travel (m)</label>
+        <input id="sbTravel" type="number" min="0.3" max="3" step="0.05" value="1.5">
+      </div>
+    </div>
+
+    <div class="sb-spec" id="sbSpec"></div>
+  </section>
 
   <div class="rail-wrap" id="railWrap">
     <button class="rail-btn" id="railPrev" type="button" aria-label="Scroll to earlier levels" aria-controls="rail">
@@ -953,16 +1052,18 @@
   }
 
   KEYS.forEach(function (k) {
-    sliders[k].addEventListener("input", function () { readSliders(); startTest(); });
+    sliders[k].addEventListener("input", function () { readSliders(); restart(); });
   });
 
   $("mm").addEventListener("change", function (e) { motionMagic = e.target.checked; startTest(); });
   $("rep").addEventListener("change", function (e) { autoRep = e.target.checked; });
-  $("run").addEventListener("click", startTest);
+  function restart() { if (mode === "sandbox") sbStart(); else startTest(); }
+
+  $("run").addEventListener("click", restart);
   $("diagNext").addEventListener("click", newCase);
   $("reset").addEventListener("click", function () {
     KEYS.forEach(function (k) { sliders[k].value = 0; });
-    readSliders(); startTest();
+    readSliders(); restart();
   });
 
   function setResult(kind, head, body) {
@@ -1433,6 +1534,265 @@
     });
   }
 
+  // ================= sandbox mode =================
+  // A real mechanism in SI units, so every set of parameters has its own
+  // correct answer. Verified by verify_sandbox.js - in particular that zero
+  // gains really does mean zero volts and the thing simply falls.
+
+  var MOTORS = {
+    "Kraken X60": { stall: 7.09, freeRpm: 6000 },
+    "Falcon 500": { stall: 4.69, freeRpm: 6380 },
+    "NEO":        { stall: 2.60, freeRpm: 5676 },
+    "NEO 550":    { stall: 0.97, freeRpm: 11000 },
+    "CIM":        { stall: 2.41, freeRpm: 5330 }
+  };
+  var G_ACC = 9.81, EFF = 0.85;
+
+  var mode = "levels";
+  var sb = { kind: "arm", motor: "NEO", motors: 2, ratio: 60, mass: 5,
+             len: 0.7, drum: 0.03, travel: 1.5, damp: 1.0 };
+  var sbPos = 0, sbVel = 0, sbInt = 0, sbPrev = 0, sbTarget = 0;
+
+  function freeRad(name) { return MOTORS[name].freeRpm * 2 * Math.PI / 60; }
+
+  function sbMechTorque(volts, omegaMech) {
+    var M = MOTORS[sb.motor];
+    var tau = M.stall * (volts / VMAX) - M.stall * (omegaMech * sb.ratio) / freeRad(sb.motor);
+    return tau * sb.motors * sb.ratio * EFF;
+  }
+
+  function sbIdealKG() {
+    var M = MOTORS[sb.motor];
+    var load = sb.kind === "arm" ? sb.mass * G_ACC * sb.len : sb.mass * G_ACC * sb.drum;
+    return VMAX * load / (M.stall * sb.motors * sb.ratio * EFF);
+  }
+  function sbIdealKV() {
+    var fm = freeRad(sb.motor) / sb.ratio;
+    return sb.kind === "arm" ? VMAX / fm : VMAX / (fm * sb.drum);
+  }
+  function sbDamp() { return sb.kind === "arm" ? 1.0 : 6.0; }
+
+  function sbStep(dt) {
+    var err = sbTarget - sbPos;
+    sbInt += err * dt;
+    sbInt = Math.max(-50, Math.min(50, sbInt));
+    var der = (err - sbPrev) / dt;
+    sbPrev = err;
+
+    var grav = sb.kind === "arm" ? Math.cos(sbPos) : 1;
+    terms.p = gains.P * err;
+    terms.i = gains.I * sbInt;
+    terms.d = gains.D * der;
+    terms.g = gains.G * grav;
+    terms.s = gains.S * (sbVel > 1e-4 ? 1 : sbVel < -1e-4 ? -1 : 0);
+    terms.v = gains.V * sbVel;
+
+    var volts = terms.p + terms.i + terms.d + terms.g + terms.s + terms.v;
+    volts = Math.max(-VMAX, Math.min(VMAX, volts));
+    terms.out = volts;
+
+    var tau = sbMechTorque(volts, sbVel), acc2;
+    if (sb.kind === "arm") {
+      var J = sb.mass * sb.len * sb.len;
+      acc2 = (tau - sb.mass * G_ACC * sb.len * Math.cos(sbPos) - sbDamp() * sbVel) / J;
+    } else {
+      acc2 = (tau / sb.drum - sb.mass * G_ACC - sbDamp() * sbVel) / sb.mass;
+    }
+    sbVel += acc2 * dt;
+    sbPos += sbVel * dt;
+
+    if (sb.kind === "arm") {
+      if (sbPos < -Math.PI / 2) { sbPos = -Math.PI / 2; if (sbVel < 0) sbVel = 0; }
+      if (sbPos > Math.PI / 2) { sbPos = Math.PI / 2; if (sbVel > 0) sbVel = 0; }
+    } else {
+      if (sbPos < 0) { sbPos = 0; if (sbVel < 0) sbVel = 0; }
+      if (sbPos > sb.travel) { sbPos = sb.travel; if (sbVel > 0) sbVel = 0; }
+    }
+    return sbTarget;
+  }
+
+  function sbStart() {
+    sbPos = sb.kind === "arm" ? -Math.PI / 2 : 0;
+    sbVel = 0; sbInt = 0;
+    sbTarget = sb.kind === "arm" ? Math.PI / 3 : sb.travel * 0.6;
+    sbPrev = sbTarget - sbPos;
+    trace.length = 0; rec.length = 0;
+    testT = 0; idleT = 0; scored = false;
+  }
+
+  // display units: degrees for the arm, centimetres for the elevator
+  function sbToDisp(v) { return sb.kind === "arm" ? v * 180 / Math.PI : v * 100; }
+  function sbUnit() { return sb.kind === "arm" ? "\u00b0" : " cm"; }
+
+  function sbMetrics() {
+    var m = { overshoot: 0, settleErr: 999, chatter: 0 };
+    if (rec.length < 8) return m;
+    var over = 0;
+    for (var i = 0; i < rec.length; i++) {
+      var d = sbToDisp(rec[i].a - sbTarget);
+      if (d > over) over = d;
+    }
+    m.overshoot = over;
+    var n = Math.min(rec.length, Math.round(1.0 / SAMPLE)), sum = 0;
+    for (var j = rec.length - n; j < rec.length; j++) sum += Math.abs(sbToDisp(rec[j].a - sbTarget));
+    m.settleErr = sum / n;
+    var flips = 0;
+    for (var k = Math.max(1, rec.length - 60); k < rec.length; k++) {
+      if ((rec[k].o > 0) !== (rec[k - 1].o > 0)) flips++;
+    }
+    m.chatter = flips / 12;
+    return m;
+  }
+
+  function sbJudge(m) {
+    var tolS = sb.kind === "arm" ? 2.5 : 2.0;     // deg / cm
+    var tolO = sb.kind === "arm" ? 5.0 : 4.0;
+    if (m.settleErr <= tolS && m.overshoot <= tolO) {
+      setResult("pass", "Tuned",
+        "Settled within <b>" + m.settleErr.toFixed(1) + sbUnit() + "</b> with " +
+        (m.overshoot < 0.5 ? "no overshoot" : m.overshoot.toFixed(1) + sbUnit() + " overshoot") +
+        ". Write these gains down - they are specific to this mechanism.");
+    } else if (m.settleErr > 900) {
+      setResult("fail", "No movement yet", "Every gain is zero, so the motor gets 0 V and gravity wins. Start with <b>kG</b> to hold the weight, then add <b>kP</b>.");
+    } else if (m.overshoot > tolO) {
+      setResult("fail", "Overshooting " + m.overshoot.toFixed(1) + sbUnit(),
+        "Add <b>kD</b> to damp the approach, or ease <b>kP</b> back.");
+    } else {
+      setResult("fail", "Off by " + m.settleErr.toFixed(1) + sbUnit(),
+        "Needs within <b>" + tolS + sbUnit() + "</b>. If it sags short, <b>kG</b> is too low for this load; if it creeps, add a little <b>kI</b>.");
+    }
+  }
+
+  // ---- deterministic per-student assignment ----
+  function sbHash(s) {
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+    return h >>> 0;
+  }
+  function sbAssign(seed) {
+    var h = sbHash(String(seed));
+    function pick(a, sh) { return a[(h >>> sh) % a.length]; }
+    function span(lo, hi, sh) { return lo + (((h >>> sh) % 1000) / 1000) * (hi - lo); }
+    sb.kind = pick(["arm", "elevator"], 3);
+    sb.motor = pick(["Kraken X60", "Falcon 500", "NEO", "NEO 550", "CIM"], 7);
+    sb.motors = pick([1, 1, 2, 2, 4], 11);
+    sb.ratio = Math.round(span(20, 160, 13));
+    sb.mass = Math.round(span(sb.kind === "arm" ? 2 : 4, sb.kind === "arm" ? 9 : 16, 19) * 10) / 10;
+    if (sb.kind === "arm") sb.len = Math.round(span(0.3, 1.1, 23) * 100) / 100;
+    else {
+      sb.drum = Math.round(span(0.018, 0.045, 23) * 1000) / 1000;
+      sb.travel = Math.round(span(0.8, 1.8, 29) * 20) / 20;
+    }
+    sbToForm();
+    sbApply();
+  }
+
+  // ---- form <-> config ----
+  function sbToForm() {
+    $("sbKind").value = sb.kind;
+    $("sbMotor").value = sb.motor;
+    $("sbCount").value = String(sb.motors);
+    $("sbRatio").value = sb.ratio;
+    $("sbMass").value = sb.mass;
+    $("sbLen").value = sb.len;
+    $("sbDrum").value = sb.drum;
+    $("sbTravel").value = sb.travel;
+  }
+
+  function sbFromForm() {
+    sb.kind = $("sbKind").value;
+    sb.motor = $("sbMotor").value;
+    sb.motors = parseInt($("sbCount").value, 10) || 1;
+    sb.ratio = Math.max(1, parseFloat($("sbRatio").value) || 1);
+    sb.mass = Math.max(0.1, parseFloat($("sbMass").value) || 1);
+    sb.len = Math.max(0.05, parseFloat($("sbLen").value) || 0.5);
+    sb.drum = Math.max(0.005, parseFloat($("sbDrum").value) || 0.03);
+    sb.travel = Math.max(0.2, parseFloat($("sbTravel").value) || 1);
+  }
+
+  // Slider ranges have to follow the mechanism: an elevator in metres needs
+  // gains an order of magnitude larger than an arm in radians.
+  function sbRanges() {
+    var arm = sb.kind === "arm";
+    var r = { P: arm ? 200 : 1200, I: arm ? 60 : 300, D: arm ? 60 : 150,
+              G: 12, S: 3, V: arm ? 12 : 40 };
+    KEYS.forEach(function (k) {
+      var el = sliders[k];
+      var cur = parseFloat(el.value) || 0;
+      el.min = 0; el.max = r[k]; el.step = r[k] / 500;
+      el.value = Math.min(cur, r[k]);
+      $("g" + k).classList.remove("hidden");
+      var t = $("term" + k); if (t) t.classList.remove("hidden");
+    });
+    readSliders();
+  }
+
+  function sbSpec() {
+    var kg = sbIdealKG(), stall = MOTORS[sb.motor].stall * sb.motors * sb.ratio * EFF;
+    var html =
+      "<span>load <b>" + (sb.kind === "arm"
+        ? (sb.mass * G_ACC * sb.len).toFixed(1) + " N\u00b7m"
+        : (sb.mass * G_ACC).toFixed(0) + " N") + "</b></span>" +
+      "<span>stall <b>" + (sb.kind === "arm"
+        ? stall.toFixed(0) + " N\u00b7m"
+        : (stall / sb.drum).toFixed(0) + " N") + "</b></span>" +
+      "<span>free speed <b>" + (sb.kind === "arm"
+        ? (freeRad(sb.motor) / sb.ratio).toFixed(2) + " rad/s"
+        : (freeRad(sb.motor) / sb.ratio * sb.drum).toFixed(2) + " m/s") + "</b></span>" +
+      "<span>target <b>" + sbToDisp(sb.kind === "arm" ? Math.PI / 3 : sb.travel * 0.6).toFixed(0) +
+        sbUnit() + "</b></span>";
+    if (kg > VMAX) html += "<span style='color:var(--bad)'><b>under-geared: cannot hold its own weight</b></span>";
+    $("sbSpec").innerHTML = html;
+  }
+
+  function sbApply() {
+    sbFromForm();
+    $("sbLenF").classList.toggle("hidden", sb.kind !== "arm");
+    $("sbDrumF").classList.toggle("hidden", sb.kind !== "elevator");
+    $("sbTravelF").classList.toggle("hidden", sb.kind !== "elevator");
+    $("sbMassL").textContent = sb.kind === "arm" ? "Mass at end (kg)" : "Carriage mass (kg)";
+    $("stageLabel").textContent = sb.kind === "arm" ? "The arm" : "The elevator";
+    $("kOver").textContent = "Overshoot";
+    $("legend").innerHTML =
+      '<span style="color:var(--c-i)">target</span> &nbsp; <span style="color:var(--c-p)">position</span>';
+    sbRanges();
+    sbSpec();
+    sbStart();
+  }
+
+  function setMode(m) {
+    mode = m;
+    document.body.setAttribute("data-mode", m);
+    $("mLevels").classList.toggle("on", m === "levels");
+    $("mSandbox").classList.toggle("on", m === "sandbox");
+    $("mLevels").setAttribute("aria-selected", m === "levels");
+    $("mSandbox").setAttribute("aria-selected", m === "sandbox");
+    if (m === "sandbox") { sbApply(); }
+    else { selectLevel(level); }
+  }
+
+  (function initSandbox() {
+    var sel = $("sbMotor"), names = Object.keys(MOTORS);
+    for (var i = 0; i < names.length; i++) {
+      var o = document.createElement("option");
+      o.value = names[i]; o.textContent = names[i];
+      sel.appendChild(o);
+    }
+    sel.value = sb.motor;
+    ["sbKind", "sbMotor", "sbCount", "sbRatio", "sbMass", "sbLen", "sbDrum", "sbTravel"]
+      .forEach(function (id) { $(id).addEventListener("change", sbApply); });
+    $("sbGen").addEventListener("click", function () {
+      var v = $("sbSeed").value.trim();
+      if (v) sbAssign(v);
+    });
+    $("sbSeed").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); $("sbGen").click(); }
+    });
+    $("mLevels").addEventListener("click", function () { setMode("levels"); });
+    $("mSandbox").addEventListener("click", function () { setMode("sandbox"); });
+    document.body.setAttribute("data-mode", "levels");
+  })();
+
   // ---------------- loop ----------------
   var acc = 0, sAcc = 0, lastNow = performance.now();
 
@@ -1440,6 +1800,8 @@
     var dt = Math.min((now - lastNow) / 1000, 0.05);
     lastNow = now;
     acc += dt;
+
+    if (mode === "sandbox") { frameSandbox(); requestAnimationFrame(frame); return; }
 
     var L = LEVELS[level];
     var cmd = motionMagic ? profPos : target;
@@ -1481,6 +1843,107 @@
     $("sOut").style.color = browned ? "var(--coral)" : "var(--cream)";
 
     requestAnimationFrame(frame);
+  }
+
+  var SB_DUR = 6;
+
+  function frameSandbox() {
+    while (acc >= SUB) {
+      acc -= SUB;
+      if (testT >= 0 && testT < SB_DUR) {
+        sbStep(SUB);
+        testT += SUB;
+        sAcc += SUB;
+        if (sAcc >= SAMPLE) {
+          sAcc -= SAMPLE;
+          trace.push({ t: testT, a: sbPos, c: sbTarget, o: terms.out });
+          rec.push({ t: testT, a: sbPos, target: sbTarget });
+        }
+      } else if (testT >= SB_DUR) {
+        if (!scored) { scored = true; sbJudge(sbMetrics()); }
+        idleT += SUB;
+        if (autoRep && idleT > 1.2) sbStart();
+      }
+    }
+
+    drawSandboxStage();
+    drawScope();
+    drawTerms();
+
+    var m = sbMetrics();
+    $("sOver").textContent = m.overshoot > 0.3 ? m.overshoot.toFixed(1) + sbUnit() : "0" + sbUnit();
+    $("sSettle").textContent = m.settleErr < 900 ? m.settleErr.toFixed(1) + sbUnit() : "&mdash;";
+    $("sOut").textContent = terms.out.toFixed(1) + "V";
+    $("sOut").style.color = "var(--ink)";
+    $("sCh").textContent = m.chatter.toFixed(2);
+    $("sCh").style.color = m.chatter > 1.0 ? "var(--bad)" : "var(--ink)";
+  }
+
+  function drawSandboxStage() {
+    var d = fit(armC), x = armX;
+    x.setTransform(d.r, 0, 0, d.r, 0, 0);
+    x.clearRect(0, 0, d.w, d.h);
+    if (sb.kind === "arm") {
+      var px = d.w * 0.27, py = d.h * 0.76;
+      var len = Math.min(d.w * 0.42, d.h * 0.60);
+
+      x.strokeStyle = "#E4E4E7"; x.lineWidth = 1;
+      x.beginPath(); x.moveTo(d.w * 0.06, py + 0.5); x.lineTo(d.w * 0.94, py + 0.5); x.stroke();
+
+      x.strokeStyle = "#B45309"; x.lineWidth = 3; x.globalAlpha = 0.42; x.setLineDash([5, 5]);
+      x.beginPath(); x.moveTo(px, py);
+      x.lineTo(px + Math.cos(sbTarget) * len, py - Math.sin(sbTarget) * len);
+      x.stroke(); x.setLineDash([]); x.globalAlpha = 1;
+
+      x.strokeStyle = "#C2255C"; x.lineWidth = 7; x.lineCap = "round";
+      x.beginPath(); x.moveTo(px, py);
+      x.lineTo(px + Math.cos(sbPos) * len, py - Math.sin(sbPos) * len);
+      x.stroke();
+
+      x.fillStyle = "#E05C87";
+      x.beginPath();
+      x.arc(px + Math.cos(sbPos) * len, py - Math.sin(sbPos) * len, 9, 0, Math.PI * 2);
+      x.fill();
+      x.fillStyle = "#0A0A0B";
+      x.beginPath(); x.arc(px, py, 5.5, 0, Math.PI * 2); x.fill();
+
+      $("angleOut").textContent = (sbPos * 180 / Math.PI).toFixed(1) + "\u00b0";
+    } else {
+      drawElevator(d, x);
+      $("angleOut").textContent = (sbPos * 100).toFixed(1) + " cm";
+    }
+  }
+
+  function drawElevator(d, x) {
+    var railX = d.w * 0.34, top = d.h * 0.12, bot = d.h * 0.88, h = bot - top;
+    function yOf(p) { return bot - (p / sb.travel) * h; }
+
+    x.strokeStyle = "#CBD5E1"; x.lineWidth = 8; x.lineCap = "round";
+    x.beginPath(); x.moveTo(railX, top); x.lineTo(railX, bot); x.stroke();
+    x.strokeStyle = "#94A3B8"; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(railX - 16, bot + 4); x.lineTo(railX + 16, bot + 4); x.stroke();
+
+    // target line
+    x.strokeStyle = "#B45309"; x.lineWidth = 2; x.setLineDash([6, 5]);
+    x.beginPath(); x.moveTo(railX - 30, yOf(sbTarget)); x.lineTo(railX + 78, yOf(sbTarget)); x.stroke();
+    x.setLineDash([]);
+
+    // carriage
+    var cy = yOf(sbPos);
+    x.fillStyle = "#C2255C";
+    x.beginPath();
+    if (x.roundRect) x.roundRect(railX - 26, cy - 15, 52, 30, 5);
+    else x.rect(railX - 26, cy - 15, 52, 30);
+    x.fill();
+    x.fillStyle = "#FAFAFA";
+    x.beginPath(); x.arc(railX, cy, 4.5, 0, Math.PI * 2); x.fill();
+
+    x.fillStyle = "#0A0A0B";
+    x.font = "600 26px " + "-apple-system, system-ui, sans-serif";
+    x.fillText((sbPos * 100).toFixed(1) + " cm", railX + 92, cy + 4);
+    x.fillStyle = "#6B6B73";
+    x.font = "12px " + "'SF Mono', ui-monospace, Menlo, monospace";
+    x.fillText("target " + (sbTarget * 100).toFixed(0) + " cm", railX + 92, cy + 24);
   }
 
   function applyGains(g) {
